@@ -17,5 +17,5 @@ uploads/
 outputs/
 
 # Stitched intermediate images (capture pipeline)
-apps/api/src/capture/capture/stitchedImages/
-apps/api/src/capture/stitchedImages/
+src/capture/capture/stitchedImages/
+src/capture/stitchedImages/
