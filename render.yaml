@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: visual-differ-api
+    runtime: node
+    rootDir: apps/api
+    buildCommand: yarn && yarn playwright install chromium
+    startCommand: yarn start
+    envVars:
+      - key: PLAYWRIGHT_BROWSERS_PATH
+        value: /opt/render/project/.playwright-browsers
+      - key: NODE_ENV
+        value: production
