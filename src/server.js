@@ -10,6 +10,8 @@ import pagesRouter from "./routes/pages.js";
 import compareSiteRouter from "./routes/compareSite.js";
 import compareRouter from "./routes/compareImages.js";
 
+import { captureConfig } from "./capture/config.js";
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OUTPUTS_DIR = path.resolve(__dirname, "outputs");
 const UPLOADS_DIR = path.resolve(__dirname, "uploads");

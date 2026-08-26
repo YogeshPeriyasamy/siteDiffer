@@ -6,17 +6,12 @@ import { fileURLToPath } from "url";
 
 import manifestSections from "../services/siteService.js";
 import { getBrowser } from "../capture/browser.js";
+import { captureConfig } from "../capture/config.js";
 import { captureEnv } from "../services/captureService.js";
-import {
-  matchDatasetSections,
-  diffSections,
-  buildDiffStitchSections,
-  calcAvgMismatch,
-  toOutputUrl,
-} from "../services/diffService.js";
+import { matchDatasetSections, diffSections, buildDiffStitchSections, calcAvgMismatch, toOutputUrl } from "../services/diffService.js";
 import { pageStitcher } from "../capture/pageStitcher.js";
 
-const __dirname   = path.dirname(fileURLToPath(import.meta.url));
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OUTPUTS_DIR = path.resolve(__dirname, "..", "outputs");
 
 const router = Router();
@@ -39,7 +34,22 @@ router.post("/compare-site", async (req, res) => {
   let browser;
 
   try {
-    const { siteName, liveBaseUrl, stagingBaseUrl, pages } = req.body;
+    const { siteName, liveBaseUrl, stagingBaseUrl, pages, selectedDisplayResolution } = req.body;
+    // console.log(`selected display : ${selectedDisplayResolution}`);
+
+    const captureRunConfig = {
+      ...captureConfig,
+      viewport:
+        selectedDisplayResolution === "desktop"
+          ? {
+              width: 1440,
+              height: 978,
+            }
+          : {
+              width: 412,
+              height: 924,
+            },
+    };
 
     if (!siteName || !liveBaseUrl || !stagingBaseUrl || !pages?.length) {
       return res.status(400).json({
@@ -47,25 +57,24 @@ router.post("/compare-site", async (req, res) => {
       });
     }
 
-    const { live: liveManifest, staging: stagingManifest } =
-      await manifestSections(siteName, pages, liveBaseUrl, stagingBaseUrl);
+    const { live: liveManifest, staging: stagingManifest } = await manifestSections(siteName, pages, liveBaseUrl, stagingBaseUrl);
 
     browser = await getBrowser();
 
     // Unique folder for this run
-    const runId  = randomUUID();
+    const runId = randomUUID();
     const runDir = path.join(OUTPUTS_DIR, runId);
     fs.mkdirSync(runDir, { recursive: true });
 
     // Run timestamp
-    const now     = new Date();
-    const runDate = now.toISOString().split("T")[0];   // YYYY-MM-DD
-    const runTime = now.toTimeString().split(" ")[0];  // HH:MM:SS
+    const now = new Date();
+    const runDate = now.toISOString().split("T")[0]; // YYYY-MM-DD
+    const runTime = now.toTimeString().split(" ")[0]; // HH:MM:SS
 
     const allPageResults = [];
 
     for (const pageName of pages) {
-      const livePageDef    = liveManifest[pageName];
+      const livePageDef = liveManifest[pageName];
       const stagingPageDef = stagingManifest[pageName];
 
       if (!livePageDef || !stagingPageDef) {
@@ -80,16 +89,12 @@ router.post("/compare-site", async (req, res) => {
 
       // ── Capture live + staging in parallel ─────────────────────────────
       const [liveResult, stagingResult] = await Promise.all([
-        captureEnv(browser, livePageDef,    path.join(pageDir, "live.png")),
-        captureEnv(browser, stagingPageDef, path.join(pageDir, "staging.png")),
+        captureEnv(browser, livePageDef, path.join(pageDir, "live.png"), captureRunConfig),
+        captureEnv(browser, stagingPageDef, path.join(pageDir, "staging.png"), captureRunConfig),
       ]);
 
       // ── Match, diff, and build diff section map ─────────────────────────
-      const matches = matchDatasetSections(
-        liveResult.capturedSections,
-        stagingResult.capturedSections,
-        livePageDef.sections,
-      );
+      const matches = matchDatasetSections(liveResult.capturedSections, stagingResult.capturedSections, livePageDef.sections);
 
       const { diffSectionMap, sectionMismatchPcts } = await diffSections(matches);
 
@@ -101,19 +106,19 @@ router.post("/compare-site", async (req, res) => {
       const avgMismatchPct = calcAvgMismatch(sectionMismatchPcts);
 
       allPageResults.push({
-        page:           pageName,
-        livePageUrl:    livePageDef.url,
+        page: pageName,
+        livePageUrl: livePageDef.url,
         stagingPageUrl: stagingPageDef.url,
-        liveUrl:        toOutputUrl(path.join(runId, pageName, "live.png")),
-        stagingUrl:     toOutputUrl(path.join(runId, pageName, "staging.png")),
-        diffUrl:        toOutputUrl(path.join(runId, pageName, "diff.png")),
+        liveUrl: toOutputUrl(path.join(runId, pageName, "live.png")),
+        stagingUrl: toOutputUrl(path.join(runId, pageName, "staging.png")),
+        diffUrl: toOutputUrl(path.join(runId, pageName, "diff.png")),
         avgMismatchPct,
         sectionCount: {
-          defined:          livePageDef.sections.length,
-          captured:         Object.keys(diffSectionMap).length,
-          matched:          matches.filter((m) => m.kind === "matched").length,
+          defined: livePageDef.sections.length,
+          captured: Object.keys(diffSectionMap).length,
+          matched: matches.filter((m) => m.kind === "matched").length,
           missingInStaging: matches.filter((m) => m.kind === "live-only").length,
-          missingInLive:    matches.filter((m) => m.kind === "staging-only").length,
+          missingInLive: matches.filter((m) => m.kind === "staging-only").length,
         },
       });
     }

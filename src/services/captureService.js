@@ -17,10 +17,10 @@ import { pageStitcher, normalizeSectionLayout } from "../capture/pageStitcher.js
 //
 // Returns { capturedSections, resolvedSections, stitched }
 // ---------------------------------------------------------------------------
-export async function captureEnv(browser, pageDef, outPath) {
+export async function captureEnv(browser, pageDef, outPath, config = captureConfig) {
   const context = await browser.newContext({
-    viewport:          captureConfig.viewport,
-    deviceScaleFactor: captureConfig.deviceScaleFactor,
+    viewport:          config.viewport,
+    deviceScaleFactor: config.deviceScaleFactor,
   });
 
   try {
@@ -29,8 +29,8 @@ export async function captureEnv(browser, pageDef, outPath) {
     console.log(`[captureEnv] Navigating to: ${pageDef.url}`);
 
     await page.goto(pageDef.url, {
-      waitUntil: captureConfig.waitUntil,
-      timeout:   captureConfig.timeout,
+      waitUntil: config.waitUntil,
+      timeout:   config.timeout,
     });
 
     await cleanUp(page);
@@ -57,7 +57,7 @@ export async function captureEnv(browser, pageDef, outPath) {
       sections:           resolvedSections,
     };
 
-    const capturedSections = await captureSections(page, extraction, captureConfig);
+    const capturedSections = await captureSections(page, extraction, config);
     const orderedSections  = normalizeSectionLayout(resolvedSections);
     const stitched         = await pageStitcher(orderedSections, capturedSections, outPath);
 
