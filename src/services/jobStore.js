@@ -69,6 +69,11 @@ export function failJob(runId, errorMessage) {
   scheduleEviction(runId);
 }
 
+export function deleteJob(runId) {
+  store.delete(runId);
+  listeners.delete(runId);
+}
+
 // ── Internal ──────────────────────────────────────────────────────────────
 
 function scheduleEviction(runId) {
