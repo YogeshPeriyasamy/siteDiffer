@@ -465,7 +465,7 @@ export const siteData = {
   //   live: {
   //     pages: [
   //       {
-  //         page: "home",
+  //         page: "Home",
   //         path: "/",
   //         scrollIsWindow: true,
   //         scrollRoot: null,
@@ -586,7 +586,7 @@ export const siteData = {
   //   staging: {
   //     pages: [
   //       {
-  //         page: "home",
+  //         page: "Home",
   //         path: "/",
   //         scrollIsWindow: true,
   //         scrollRoot: null,

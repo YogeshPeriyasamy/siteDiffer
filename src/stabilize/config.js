@@ -36,7 +36,7 @@ export const defaultConfig = {
   },
 
   images: {
-    timeoutMs: 60000,
+    timeoutMs: 20000,
   },
 
   fonts: {

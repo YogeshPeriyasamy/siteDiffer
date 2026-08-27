@@ -26,13 +26,13 @@ export async function cleanUp(page) {
       '[role="dialog"]',
       '[aria-modal="true"]',
       '[class*="modal"]',
-      '[class*="popup"]',
+      '[class*="popup"]:not(.popupVideoContainer):not(.popupVideoContainer *)',
       '[class*="overlay"]',
       '[class*="backdrop"]',
       '[class*="cookie"]',
       '[class*="consent"]',
       '[id*="modal"]',
-      '[id*="popup"]',
+      // '[id*="popup"]',
       '[id*="overlay"]',
       '[id*="cookie"]',
       '[id*="consent"]',
@@ -67,6 +67,7 @@ export async function cleanUp(page) {
           centerElements.forEach((el) => {
             try {
               if (!el || el === document.body || el === document.documentElement) return;
+              if (el.closest(".popupVideoContainer")) return;
 
               const s = getComputedStyle(el);
               const rect = el.getBoundingClientRect();
