@@ -18,7 +18,7 @@ export default async function manifestSections(siteName, pages, liveBaseUrl, sta
   const siteEntry = siteData[normalizedSiteName];
   if (!siteEntry) throw new Error(`[manifestSections] Unknown site: "${siteName}"`);
 
-  const live    = buildEnvMap(siteEntry.live?.pages    ?? [], pages, liveBaseUrl);
+  const live = buildEnvMap(siteEntry.live?.pages ?? [], pages, liveBaseUrl);
   const staging = buildEnvMap(siteEntry.staging?.pages ?? [], pages, stagingBaseUrl);
 
   return { live, staging };
@@ -58,10 +58,10 @@ function buildExtractionResult(pageObj, baseUrl) {
 
   return {
     url,
-    page:               pageObj.page,
+    page: pageObj.page,
     scrollRootSelector: pageObj.scrollRoot ?? null,
     scrollRootIsWindow: pageObj.scrollIsWindow ?? true,
-    pageInfo:           { width: 0, height: 0, maxScrollY: 0 },
+    pageInfo: { width: 0, height: 0, maxScrollY: 0 },
     sections,
   };
 }
@@ -72,13 +72,7 @@ function buildExtractionResult(pageObj, baseUrl) {
 // Expands one dataset section into one or more SectionDescriptors, one per state.
 // ---------------------------------------------------------------------------
 function expandSectionStates(sectionDef) {
-  const {
-    section: sectionName,
-    selector,
-    state = [],
-    captureType = "normal",
-    floating = false,
-  } = sectionDef;
+  const { section: sectionName, selector, state = [], captureType = "normal", floating = false } = sectionDef;
 
   if (!state || state.length === 0) {
     return [buildSectionDescriptor(sectionName, selector, null, null, captureType, floating)];
@@ -102,8 +96,13 @@ function buildSectionDescriptor(key, selector, stateConfig, stateIndex, captureT
     stateIndex,
     captureType,
     floating,
-    x: 0, y: 0, width: 0, height: 0,
-    viewportX: 0, viewportY: 0, viewportRect: null,
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0,
+    viewportX: 0,
+    viewportY: 0,
+    viewportRect: null,
     sampleScrollY: 0,
     discovery: "dataset",
   };
@@ -148,10 +147,8 @@ export function getPagesForSite(siteKey) {
     for (const p of entry[envKey]?.pages ?? []) {
       if (!seen.has(p.page)) {
         seen.set(p.page, {
-          id:    p.page,
-          label: p.page
-            .replace(/_/g, " ")
-            .replace(/\b\w/g, (c) => c.toUpperCase()),
+          id: p.page,
+          label: p.page.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
           path: p.path,
         });
       }
@@ -169,12 +166,19 @@ function resolveSiteKey(siteName) {
   if (siteData[siteName]) return siteName;
 
   const normalized = siteName.trim();
-  const match = Object.keys(siteData).find(
-    (key) => key.toLowerCase() === normalized.toLowerCase(),
-  );
+  const match = Object.keys(siteData).find((key) => key.toLowerCase() === normalized.toLowerCase());
   return match ?? normalized;
 }
 
 function buildPageUrl(baseUrl, pagePath) {
   return new URL(baseUrl).origin + pagePath;
+}
+
+export async function validateURL(url) {
+  try {
+    const response = await fetch(url, { method: "HEAD", signal: AbortSignal.timeout(5000) });
+    return response.ok;
+  } catch {
+    return false;
+  }
 }

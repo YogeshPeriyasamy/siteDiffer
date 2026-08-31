@@ -4,7 +4,7 @@ import { padImage } from "./pad.js";
 export async function preprocessImage(liveImagePath, stagedImagePath) {
     try {
 
-        console.log("Preprocessing images:", { liveImagePath, stagedImagePath });
+        // console.log("Preprocessing images:", { liveImagePath, stagedImagePath });
         // Normalize the image data to ensure consistent comparison
         const liveImage = await normalizeImage(liveImagePath);
         const stagedImage = await normalizeImage(stagedImagePath);

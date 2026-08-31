@@ -13,5 +13,5 @@ export function writeToFile(filename, data) {
     const outputPath = path.join(dataDir, filename);
     fs.writeFileSync(outputPath, JSON.stringify(data));
     fs.appendFileSync(appendPath, "\n" + JSON.stringify(data)); // Add a newline after the JSON data for better readability    
-    console.log(`Data written to ${outputPath}`);
+    // console.log(`Data written to ${outputPath}`);
 }

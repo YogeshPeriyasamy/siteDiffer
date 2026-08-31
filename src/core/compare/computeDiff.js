@@ -3,7 +3,7 @@ import { writeToFile } from "../utils/fileWriter.js";
 export function computeDiff(liveImage, stagedImage, width, height, options = {}) {
     const { threshold = 35, ignoreAA = false } = options;
     
-    console.log("Computing perceptual diff with AA detection...", { width, height, threshold, ignoreAA });
+    // console.log("Computing perceptual diff with AA detection...", { width, height, threshold, ignoreAA });
 
     const diffData = new Uint8Array(width * height);
     let count = 0;
