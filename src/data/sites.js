@@ -471,7 +471,13 @@ export const siteData = {
           scrollRoot: null,
           sections: [
             { section: "Header", selector: ".nav", state: [], captureType: "normal", floating: false },
-            { section: "Hero", selector: ".via-dark_green", state: [], captureType: "normal", floating: false },
+            {
+              section: "Hero",
+              selector: ".via-dark_green",
+              state: [{ scrollTo: 0 }, { scrollTo: 500 }],
+              captureType: "normal",
+              floating: false,
+            },
             { section: "Abbrevation", selector: ".text-black.font-light", state: [], captureType: "normal", floating: false },
             { section: "ISI", selector: "#isi", state: [], captureType: "normal", floating: false },
             { section: "Sticky ISI", selector: ".fixed.justify-center.flex-col", state: [], captureType: "fixed", floating: true },
@@ -592,7 +598,13 @@ export const siteData = {
           scrollRoot: null,
           sections: [
             { section: "Header", selector: ".nav", state: [], captureType: "normal", floating: false },
-            { section: "Hero", selector: ".via-dark_green", state: [], captureType: "normal", floating: false },
+            {
+              section: "Hero",
+              selector: ".via-dark_green",
+              state: [{ scrollTo: 0 }, { scrollTo: 500 }],
+              captureType: "normal",
+              floating: false,
+            },
             { section: "Abbrevation", selector: ".text-black.font-light", state: [], captureType: "normal", floating: false },
             { section: "ISI", selector: "#isi", state: [], captureType: "normal", floating: false },
             { section: "Sticky ISI", selector: ".fixed.justify-center.flex-col", state: [], captureType: "fixed", floating: true },

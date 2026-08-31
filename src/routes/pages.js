@@ -43,7 +43,7 @@ router.get("/pages", async (req, res) => {
     return res.status(400).json({ message: "Invalid URL format" });
   }
   
-  console.log("live host and staging host provided by user",liveHost, stagingHost)
+  // console.log("live host and staging host provided by user",liveHost, stagingHost)
   const liveSiteKey = resolveSiteKeyFromHostname(liveHost);
   const stagingSiteKey = resolveSiteKeyFromHostname(stagingHost);
 

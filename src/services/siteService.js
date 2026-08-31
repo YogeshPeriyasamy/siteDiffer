@@ -116,7 +116,7 @@ export function resolveSiteKeyFromHostname(hostname) {
 
   const h = hostname.toLowerCase().replace(/^www\./, "");
 
-  console.log("hostname derived from it", h);
+  // console.log("hostname derived from it", h);
   // 1. exact match
   if (siteData[hostname]) return hostname;
 
