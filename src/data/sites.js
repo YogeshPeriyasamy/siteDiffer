@@ -473,8 +473,9 @@ export const siteData = {
             { section: "Header", selector: ".nav", state: [], captureType: "normal", floating: false },
             {
               section: "Hero",
-              selector: ".via-dark_green",
-              state: [{ scrollTo: 0 }, { scrollTo: 500 }],
+              // selector: ".via-dark_green",
+              selector: ".pin-spacer",
+              state: [],
               captureType: "normal",
               floating: false,
             },
@@ -600,8 +601,9 @@ export const siteData = {
             { section: "Header", selector: ".nav", state: [], captureType: "normal", floating: false },
             {
               section: "Hero",
-              selector: ".via-dark_green",
-              state: [{ scrollTo: 0 }, { scrollTo: 500 }],
+              // selector: ".via-dark_green",
+              selector: ".pin-spacer",
+              state: [],
               captureType: "normal",
               floating: false,
             },

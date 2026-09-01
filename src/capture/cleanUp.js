@@ -25,14 +25,14 @@ export async function cleanUp(page) {
     const KNOWN_SELECTORS = [
       '[role="dialog"]',
       '[aria-modal="true"]',
-      '[class*="modal"]',
+      '[class*="modal"]:not(.leaving-modal):not(.leaving-modal  *)',
       '[class*="popup"]:not(.popupVideoContainer):not(.popupVideoContainer *)',
       '[class*="overlay"]',
       '[class*="backdrop"]',
       '[class*="cookie"]',
       '[class*="consent"]',
       '[id*="modal"]',
-      // '[id*="popup"]',
+      '[id*="popup"]',
       '[id*="overlay"]',
       '[id*="cookie"]',
       '[id*="consent"]',
@@ -77,9 +77,7 @@ export async function cleanUp(page) {
               const visuallyVisible = s.display !== "none" && s.visibility !== "hidden" && s.opacity !== "0";
               const blocksClicks = s.pointerEvents !== "none";
               const highZ = z > 50;
-              const modalLike = /modal|popup|overlay|dialog|cookie|consent|backdrop/i.test(
-                (el.className || "") + " " + (el.id || ""),
-              );
+              const modalLike = /modal|popup|overlay|dialog|cookie|consent|backdrop/i.test((el.className || "") + " " + (el.id || ""));
               const shouldHide = visuallyVisible && blocksClicks && ((isFixed && highZ && largeEnough) || modalLike);
               if (shouldHide) hideElement(el, "center-blocker");
             } catch {}

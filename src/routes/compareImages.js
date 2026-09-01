@@ -11,6 +11,7 @@ const router = Router();
 // Returns the diff PNG directly as image/png.
 // ---------------------------------------------------------------------------
 router.post("/compare", async (req, res) => {
+  console.log("compare image request has been called...")
   try {
     const liveImagePath   = req.files?.["liveImage"]?.[0]?.path;
     const stagedImagePath = req.files?.["stagedImage"]?.[0]?.path;

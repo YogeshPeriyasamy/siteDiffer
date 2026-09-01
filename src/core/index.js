@@ -1,11 +1,7 @@
 import { preprocessImage } from "./processing/preprocess.js";
 import { computeDiff } from "./compare/computeDiff.js";
 import { denoise } from "./processing/denoise.js";
-import {
-  findRegions,
-  mergeRegions,
-  expandRegion,
-} from "./processing/cluster.js";
+import { findRegions, mergeRegions, expandRegion } from "./processing/cluster.js";
 import { renderWithHighlight } from "./render/createHighlight.js";
 import { encoder } from "./render/imageEncode.js";
 
@@ -17,19 +13,14 @@ import { encoder } from "./render/imageEncode.js";
 //     buffer:       Buffer  – the highlighted diff PNG
 //     mismatchPct:  number  – 0–100, percentage of pixels that differ
 //   }
-//
-// Callers that previously expected a raw Buffer should use result.buffer.
 // ---------------------------------------------------------------------------
 
 export async function compareImages(liveInput, stagedInput, options = {}) {
-  const { threshold = 75, ignoreAA = false } = options;
+  const { threshold = 0.3, ignoreAA = false } = options;
 
-  console.log("Comparing images...", { threshold, ignoreAA });
+  // console.log("Comparing images...", { threshold, ignoreAA });
   try {
-    const { width, height, liveImage, stagedImage } = await preprocessImage(
-      liveInput,
-      stagedInput,
-    );
+    const { width, height, liveImage, stagedImage } = await preprocessImage(liveInput, stagedInput);
 
     // Perceptual diff with optional AA detection
     const diff = await computeDiff(liveImage, stagedImage, width, height, {
@@ -46,23 +37,15 @@ export async function compareImages(liveInput, stagedInput, options = {}) {
     regions = regions.map((r) => expandRegion(r, width, height));
 
     // Render highlighted diff on top of staged image
-    const highlightedImage = await renderWithHighlight(
-      stagedImage,
-      regions,
-      width,
-      height,
-      denoisedDiff,
-    );
+    const highlightedImage = await renderWithHighlight(stagedImage, regions, width, height, denoisedDiff);
 
     // Encode to PNG
     const buffer = await encoder(highlightedImage, width, height);
 
     // ── Mismatch percentage ──────────────────────────────────────────────
     // diffCount is the number of genuinely different pixels after AA removal.
-    const totalPixels  = width * height;
-    const mismatchPct  = totalPixels > 0
-      ? parseFloat(((diff.diffCount / totalPixels) * 100).toFixed(2))
-      : 0;
+    const totalPixels = width * height;
+    const mismatchPct = totalPixels > 0 ? parseFloat(((diff.diffCount / totalPixels) * 100).toFixed(2)) : 0;
 
     return { buffer, mismatchPct };
   } catch (error) {
