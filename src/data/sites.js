@@ -563,6 +563,7 @@ export const siteData = {
           path: "/savings-and-support/",
           scrollIsWindow: true,
           scrollRoot: null,
+          accordianSelector: "button[aria-expanded='false']:not(a[href])",
           sections: [
             { section: "Header", selector: ".nav", state: [], captureType: "normal", floating: false },
             { section: "Hero", selector: ".bg-light_mint_green ", state: [], captureType: "normal", floating: false },
@@ -691,6 +692,7 @@ export const siteData = {
           path: "/savings-and-support/",
           scrollIsWindow: true,
           scrollRoot: null,
+          accordianSelector: "button[aria-expanded='false']:not(a[href])",
           sections: [
             { section: "Header", selector: ".nav", state: [], captureType: "normal", floating: false },
             { section: "Hero", selector: ".bg-light_mint_green ", state: [], captureType: "normal", floating: false },
@@ -767,6 +769,7 @@ export const siteData = {
           path: "/efficacy/",
           scrollIsWindow: true,
           scrollRoot: "null",
+          accordianSelector: ".css-wneze3:not(.active)",
           sections: [
             { section: "Header", selector: ".header", state: [], captureType: "normal", floating: false },
             { section: "border Img", selector: ".css-rl8t7m", state: [], captureType: "normal", floating: false },
@@ -832,6 +835,7 @@ export const siteData = {
           path: "/resources/",
           scrollIsWindow: true,
           scrollRoot: "null",
+          accordianSelector: ".css-1gwg3s3",
           sections: [
             { section: "Header", selector: ".header", state: [], captureType: "normal", floating: false },
             { section: "border Img", selector: ".css-rl8t7m", state: [], captureType: "normal", floating: false },
@@ -888,6 +892,7 @@ export const siteData = {
           path: "/efficacy/",
           scrollIsWindow: true,
           scrollRoot: "null",
+          accordianSelector: ".css-wneze3:not(.active)",
           sections: [
             { section: "Header", selector: ".header", state: [], captureType: "normal", floating: false },
             { section: "border Img", selector: ".css-rl8t7m", state: [], captureType: "normal", floating: false },
@@ -953,6 +958,7 @@ export const siteData = {
           path: "/resources/",
           scrollIsWindow: true,
           scrollRoot: "null",
+          accordianSelector: ".css-1gwg3s3",
           sections: [
             { section: "Header", selector: ".header", state: [], captureType: "normal", floating: false },
             { section: "border Img", selector: ".css-rl8t7m", state: [], captureType: "normal", floating: false },

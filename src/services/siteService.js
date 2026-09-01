@@ -63,6 +63,7 @@ function buildExtractionResult(pageObj, baseUrl) {
     scrollRootIsWindow: pageObj.scrollIsWindow ?? true,
     pageInfo: { width: 0, height: 0, maxScrollY: 0 },
     sections,
+    accordianSelector: pageObj.accordianSelector || null,
   };
 }
 

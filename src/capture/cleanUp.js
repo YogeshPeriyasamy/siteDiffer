@@ -96,3 +96,18 @@ export async function cleanUp(page) {
 
   return isContentHidden;
 }
+
+//To display the hidden content on the page
+export async function showHidden(slector, page) {
+  // console.log("showHidden function called with selector:", slector);
+  await page.evaluate(
+    ({ slector }) => {
+      const elements = document.querySelectorAll(slector);
+      elements.forEach((el) => {
+        if (el.matches("a[href]")) return; // Skip anchor tags
+        el.click();
+      });
+    },
+    { slector },
+  );
+}
