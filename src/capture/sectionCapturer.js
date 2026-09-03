@@ -91,13 +91,13 @@ export async function captureSections(page, extraction, captureConfig) {
       }
 
       const normalized = await normalizeToExactSize(captureResult.buffer, captureResult.width, captureResult.height);
-      const imagePath = await saveSectionImage(key, normalized);
+      // const imagePath = await saveSectionImage(key, normalized);
 
       capturedMapped[key] = {
         ...section,
         ...captureResult,
         buffer: normalized,
-        imagePath,
+        // imagePath,
         fullBuffer: captureResult.fullBuffer || null,
         expansion: captureResult.expansion || 0,
         floating: Boolean(section.floating),
@@ -106,11 +106,11 @@ export async function captureSections(page, extraction, captureConfig) {
     } catch (err) {
       console.error(`[capture failed] ${key}: ${err.message}`);
       const placeholder = await placeholderBuffer(section.width, section.height);
-      const imagePath = await saveSectionImage(`${key}_failed`, placeholder);
+      // const imagePath = await saveSectionImage(`${key}_failed`, placeholder);
       capturedMapped[key] = {
         ...section,
         buffer: placeholder,
-        imagePath,
+        // imagePath,
         fullBuffer: null,
         expansion: 0,
         floating: Boolean(section.floating),
@@ -781,8 +781,8 @@ async function placeholderBuffer(width, height) {
 }
 
 async function saveSectionImage(key, buffer) {
-  const safeKey = key.replace(/[:\\/*?"<>|.#\[\]\s]/g, "_").slice(0, 130);
-  const outPath = path.join(STITCHED_DIR, `${safeKey}_${Date.now()}.png`);
-  await sharp(buffer).png().toFile(outPath);
-  return outPath;
+  // const safeKey = key.replace(/[:\\/*?"<>|.#\[\]\s]/g, "_").slice(0, 130);
+  // const outPath = path.join(STITCHED_DIR, `${safeKey}_${Date.now()}.png`);
+  // await sharp(buffer).png().toFile(outPath);
+  // return outPath;
 }
