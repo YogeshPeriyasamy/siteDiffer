@@ -1,6 +1,6 @@
 import { Router } from "express";
 
-import { resolveSiteKeyFromHostname, getPagesForSite, validateURL } from "../services/siteService.js";
+import { resolveSiteKeyFromUrl, getPagesForSite, validateURL } from "../services/siteService.js";
 
 const router = Router();
 
@@ -43,9 +43,8 @@ router.get("/pages", async (req, res) => {
     return res.status(400).json({ message: "Invalid URL format" });
   }
   
-  // console.log("live host and staging host provided by user",liveHost, stagingHost)
-  const liveSiteKey = resolveSiteKeyFromHostname(liveHost);
-  const stagingSiteKey = resolveSiteKeyFromHostname(stagingHost);
+  const liveSiteKey = resolveSiteKeyFromUrl(liveUrl);
+  const stagingSiteKey = resolveSiteKeyFromUrl(stagingUrl);
 
   if (!liveSiteKey) {
     return res.status(400).json({

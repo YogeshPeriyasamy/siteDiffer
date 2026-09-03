@@ -110,7 +110,7 @@ function buildSectionDescriptor(key, selector, stateConfig, stateIndex, captureT
 }
 
 // ---------------------------------------------------------------------------
-// resolveSiteKeyFromHostname — used by the GET /pages route
+// resolveSiteKeyFromHostname — fallback for hostname-based site matching
 // ---------------------------------------------------------------------------
 export function resolveSiteKeyFromHostname(hostname) {
   if (!hostname) return null;
@@ -133,6 +133,29 @@ export function resolveSiteKeyFromHostname(hostname) {
   }
 
   return null;
+}
+
+export function resolveSiteKeyFromUrl(url) {
+  let parsedUrl;
+
+  try {
+    parsedUrl = new URL(url);
+  } catch {
+    return null;
+  }
+
+  const hostname = parsedUrl.hostname.toLowerCase().replace(/^www\./, "");
+  const pathname = parsedUrl.pathname.replace(/\/$/, "") || "/";
+
+  if (hostname === "elzonris.com" && (pathname === "/hcp" || pathname.startsWith("/hcp/"))) {
+    return "ElzonrisHCP";
+  }
+
+  if (hostname.includes("elzonrishcp")) {
+    return "ElzonrisHCP";
+  }
+
+  return resolveSiteKeyFromHostname(hostname);
 }
 
 // ---------------------------------------------------------------------------

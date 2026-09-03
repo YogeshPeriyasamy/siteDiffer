@@ -16,7 +16,7 @@ import { encoder } from "./render/imageEncode.js";
 // ---------------------------------------------------------------------------
 
 export async function compareImages(liveInput, stagedInput, options = {}) {
-  const { threshold = 0.3, ignoreAA = false } = options;
+  const { threshold = 0.1, ignoreAA = false } = options;
 
   // console.log("Comparing images...", { threshold, ignoreAA });
   try {
