@@ -21,7 +21,7 @@ export const siteData = {
         },
         {
           page: "resources",
-          path: "/resources.html#video_library",
+          path: "/resources.html#video_library", 
           scrollIsWindow: true,
           scrollRoot: null,
           sections: [
@@ -348,6 +348,7 @@ export const siteData = {
           scrollIsWindow: true,
           scrollRoot: null,
           sections: [
+            { section: "Modal", selector: ".main-cont", state: [], captureType: "fixed", floating: true },
             { section: "Header", selector: ".header", state: [], captureType: "normal", floating: false },
             { section: "Nav", selector: ".main-navigation", state: [], captureType: "normal", floating: false },
             { section: "Hero", selector: ".wrapper", state: [], captureType: "normal", floating: false },
@@ -770,6 +771,7 @@ export const siteData = {
             // { section: "sticky ISI", selector: "#sticky-isi", state: [], captureType: "fixed", floating: true },
             // { section: "Footer", selector: ".footer-wrapper", state: [], captureType: "normal", floating: false },
             { section: "Header", selector: ".header", state: [], captureType: "normal", floating: false },
+            { section: "Modal", selector: ".main-cont", state: [], captureType: "fixed", floating: true },
             { section: "Nav", selector: ".main-navigation", state: [], captureType: "normal", floating: false },
             { section: "Hero", selector: ".wrapper", state: [], captureType: "normal", floating: false },
             { section: "sticky ISI", selector: "#sticky-isi", state: [], captureType: "fixed", floating: true },
