@@ -21,7 +21,7 @@ export const siteData = {
         },
         {
           page: "resources",
-          path: "/resources.html#video_library", 
+          path: "/resources.html#video_library",
           scrollIsWindow: true,
           scrollRoot: null,
           sections: [
@@ -1312,9 +1312,9 @@ export const siteData = {
             { section: "Header", selector: ".nav", state: [], captureType: "normal", floating: false },
             {
               section: "Hero",
-              // selector: ".via-dark_green",
-              selector: ".pin-spacer",
-              state: [],
+              selector: ".via-dark_green",
+              // selector: ".pin-spacer",
+              state: [{ scrollTo: 0 }, { scrollTo: 500 }],
               captureType: "normal",
               floating: false,
             },
@@ -1441,9 +1441,9 @@ export const siteData = {
             { section: "Header", selector: ".nav", state: [], captureType: "normal", floating: false },
             {
               section: "Hero",
-              // selector: ".via-dark_green",
-              selector: ".pin-spacer",
-              state: [],
+              selector: ".via-dark_green",
+              // selector: ".pin-spacer",
+              state: [{ scrollTo: 0 }, { scrollTo: 500 }],
               captureType: "normal",
               floating: false,
             },
