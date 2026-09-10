@@ -1,6 +1,8 @@
 import { Router } from "express";
 
 import { resolveSiteKeyFromUrl, getPagesForSite, validateURL } from "../services/siteService.js";
+import { getBrowser } from "../capture/browser.js";
+import {getPagesForSite} from "../services/siteCrawler.js";
 
 const router = Router();
 
@@ -20,6 +22,11 @@ router.get("/pages", async (req, res) => {
   if (!liveUrl || !stagingUrl) {
     return res.status(400).json({ message: "Please provide valid live and staging URLs" });
   }
+
+   const browser = await getBrowser();
+
+   const liveSitepages = await getPagesForSite(liveUrl, browser);
+   const stagingSitepages = await getPagesForSite(stagingUrl, browser);
 
   //check the urls provided are valid and reachable
 
