@@ -4,9 +4,10 @@ import { getBrowser } from "../capture/browser.js";
 import { captureConfig } from "../capture/config.js";
 import { cleanUp, showHidden } from "../capture/cleanUp.js";
 import { stabilizePage } from "../stabilize/index.js";
-import { resolveGeometry, measurePage } from "../capture/screenshot.js";
+import { resolveGeometry } from "../capture/screenshot.js";
 import { captureSections } from "../capture/sectionCapturer.js";
 import { pageStitcher, normalizeSectionLayout } from "../capture/pageStitcher.js";
+import { measurePage } from "../utils/measurePage.js";
 
 // ---------------------------------------------------------------------------
 // captureEnv

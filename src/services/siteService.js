@@ -1,4 +1,5 @@
 import { siteData } from "../data/sites.js";
+import { captureConfig } from "../capture/config.js";
 
 // ---------------------------------------------------------------------------
 // manifestSections
@@ -165,26 +166,123 @@ export function resolveSiteKeyFromUrl(url) {
 // Uses live pages as the source of truth. If a page only exists in staging
 // it is also included. Pages are deduped by id.
 // ---------------------------------------------------------------------------
-export function getPagesForSite(siteKey) {
-  const entry = siteData[siteKey];
-  if (!entry) return null;
+export async function getPagesForSite(url, browser) {
+  const context = await browser.newContext({
+    viewport: captureConfig.viewport,
+    deviceScaleFactor: captureConfig.deviceScaleFactor,
+  });
 
-  const seen = new Map();
+  try {
+    const page = await context.newPage();
 
-  for (const envKey of ["live", "staging"]) {
-    for (const p of entry[envKey]?.pages ?? []) {
-      if (!seen.has(p.page)) {
-        seen.set(p.page, {
-          id: p.page,
-          label: p.page.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-          path: p.path,
-        });
-      }
+    await page.goto(url, {
+      waitUntil: captureConfig.waitUntil,
+      timeout: captureConfig.timeout,
+    });
+
+    let pages = await page.evaluate(() => {
+      const currentOrigin = window.location.origin;
+      const anchors = Array.from(document.querySelectorAll("a"));
+
+      return anchors.map((anchor) => {
+        const href = anchor.getAttribute("href");
+        if (!href) return null;
+
+        try {
+          const url = new URL(href, window.location.href);
+
+          // Only include links that are on the same origin as the current page
+          if (url.origin !== currentOrigin) return null;
+
+          // to remove section fragments #section from the path
+          url.hash = "";
+
+          return {
+            url: { fullURL: url.href, path: url.pathname, origin: url.origin },
+            label: url.pathname.split("/").filter(Boolean).pop()?.toUpperCase()?.replace(/[-_]/g, " ") || "HOME",
+          };
+        } catch {
+          return null;
+        }
+      });
+    });
+
+    pages = pages.filter((page) => page !== null);
+    //unique pages by path
+    const uniquePages = Array.from(new Map(pages.map((page) => [page.url.path, page])).values());
+    return uniquePages;
+  } catch (error) {
+    console.error("Error creating new page for page extraction:", error);
+    throw error;
+  } finally {
+    await context.close();
+  }
+}
+
+export function mapPages(livePages, stagingPages) {
+  const liveMap = new Map(livePages.map((page) => [page.url.path, page]));
+  const stagingMap = new Map(stagingPages.map((page) => [page.url.path, page]));
+
+  const matchedPages = [];
+  const addedPages = [];
+  const deletedPages = [];
+
+  //Matched + Added Pages
+  for(const stagingPage of stagingPages) {
+    const livePage = liveMap.get(stagingPage.url.path);
+
+    if(livePage) {
+      matchedPages.push({
+        path: livePage.url.path,
+        label: livePage.label,
+        live: livePage.url.fullURL,
+        staging: stagingPage.url.fullURL,
+      });
+    } else {
+      addedPages.push({
+        path: stagingPage.url.path,
+        label: stagingPage.label,
+        live: null,
+        staging: stagingPage.url.fullURL,
+      });
     }
   }
 
-  return [...seen.values()];
+  //deleted Pages
+  for(const livePage of livePages) {
+    if(!stagingMap.has(livePage.url.path)) {
+      deletedPages.push({
+        path: livePage.url.path,
+        label: livePage.label,
+        live: livePage.url.fullURL,
+        staging: null,
+      });
+    }
+  }
+
+  return { matchedPages, addedPages, deletedPages };
 }
+
+// export function getPagesForSite(siteKey) {
+//   const entry = siteData[siteKey];
+//   if (!entry) return null;
+
+//   const seen = new Map();
+
+//   for (const envKey of ["live", "staging"]) {
+//     for (const p of entry[envKey]?.pages ?? []) {
+//       if (!seen.has(p.page)) {
+//         seen.set(p.page, {
+//           id: p.page,
+//           label: p.page.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+//           path: p.path,
+//         });
+//       }
+//     }
+//   }
+
+//   return [...seen.values()];
+// }
 
 // ---------------------------------------------------------------------------
 // Private helpers

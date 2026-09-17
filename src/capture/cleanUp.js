@@ -4,17 +4,17 @@ export async function cleanUp(page) {
   // wait for delayed popups that appear after page load
   await page.waitForTimeout(1500);
 
-  const btns = await page.$$(
-    'button:has-text("Accept All"), button:has-text("Accept All Cookies") , button:has-text("Accept Cookies") , button:has-text("I Agree") , button:has-text("Allow All"), button:has-text("Got It"), button:has-text("Yes, I Agree"), button:has-text("Accept")',
-  );
-  // accept cookies if the button exists
-  for (const btn of btns) {
-    if (await btn.isVisible()) {
-      await btn.click();
-      await page.waitForTimeout(800);
-      isContentHidden = true;
-    }
-  }
+  // const btns = await page.$$(
+  //   'button:has-text("Accept All"), button:has-text("Accept All Cookies") , button:has-text("Accept Cookies") , button:has-text("I Agree") , button:has-text("Allow All"), button:has-text("Got It"), button:has-text("Yes, I Agree"), button:has-text("Accept")',
+  // );
+  // // accept cookies if the button exists
+  // for (const btn of btns) {
+  //   if (await btn.isVisible()) {
+  //     await btn.click();
+  //     await page.waitForTimeout(800);
+  //     isContentHidden = true;
+  //   }
+  // }
 
   await removeBlockingPopups(page);
 

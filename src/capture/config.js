@@ -17,4 +17,10 @@ export const captureConfig = {
   timeout: 90000,
 
   maxSections: 80,
+
+  minSectionRatio: 0.04, // 4% of the viewport height
+
+  maxSectionRatio: 0.9, // 90% of the viewport height
+
+  maxDepth: 4,
 };

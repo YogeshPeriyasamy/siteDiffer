@@ -11,6 +11,7 @@ import { captureEnv } from "../services/captureService.js";
 import { matchDatasetSections, diffSections, buildDiffStitchSections, calcAvgMismatch, toOutputUrl } from "../services/diffService.js";
 import { pageStitcher } from "../capture/pageStitcher.js";
 import { createJob, getJob, updateJob, completeJob, failJob, mapJob, deleteJob } from "../services/jobStore.js";
+import { sectionExtractor, buildPageConfig } from "../services/sectionMapper.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OUTPUTS_DIR = path.resolve(__dirname, "..", "outputs");
@@ -60,6 +61,14 @@ router.post("/compare-site", (req, res) => {
   });
 
   return res.status(202).json({ runId });
+});
+
+router.post("/compare-sites", async (req, res) => {
+  const { pages } = req.body;
+
+  const result = await runComparison({ runId: "1", selectedDisplayResolution: "desktop", pages });
+  // res.end();
+  res.status(200).json({ result });
 });
 
 // ── GET /compare-site/:runId/status ──────────────────────────────────────────
@@ -125,119 +134,158 @@ router.get("/compare-site/:runId/status", (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // runComparison — the actual async worker
 // ─────────────────────────────────────────────────────────────────────────────
-async function runComparison({ runId, siteName, liveBaseUrl, stagingBaseUrl, pages, selectedDisplayResolution }) {
+async function runComparison({ runId, selectedDisplayResolution, pages }) {
   let browser;
-  let runDir;
-  let completed = false;
 
   try {
-    // ── 0 % — Initialising ────────────────────────────────────────────────
-    updateJob(runId, { status: "running", phase: "Initialising", progress: 0 });
-
-    const captureRunConfig = {
-      ...captureConfig,
-      viewport: selectedDisplayResolution === "mobile" ? { width: 412, height: 924 } : { width: 1440, height: 978 },
-    };
-
-    const { live: liveManifest, staging: stagingManifest } = await manifestSections(siteName, pages, liveBaseUrl, stagingBaseUrl);
-
-    // ── 10 % — Launching browser ─────────────────────────────────────────
-    updateJob(runId, { phase: "Launching browser", progress: 10 });
     browser = await getBrowser();
 
-    // Unique output folder for this run
-    runDir = path.join(OUTPUTS_DIR, runId);
-    fs.mkdirSync(runDir, { recursive: true });
+    const results = [];
 
-    const now = new Date();
-    const runDate = now.toISOString().split("T")[0];
-    const runTime = now.toTimeString().split(" ")[0];
+    for (const page of pages) {
+      // Step 1: extract the full DOM hierarchy for both environments
+      const liveTree = await sectionExtractor(page.live, browser, captureConfig);
+      const stagingTree = await sectionExtractor(page.staging, browser, captureConfig);
 
-    // Per-page progress band: live 20–49 %, staging 50–79 %, visual Diff and generate report 80–100 %,
-    const pageCount = pages.length;
-    const bandPerPage = pageCount > 0 ? 1 / pageCount : 1;
+      // return { live: liveTree, staging: stagingTree };
 
-    const allPageResults = [];
-
-    for (let pi = 0; pi < pages.length; pi++) {
-      const pageName = pages[pi];
-      const livePageDef = liveManifest[pageName];
-      const stagingPageDef = stagingManifest[pageName];
-
-      if (!livePageDef || !stagingPageDef) {
-        console.warn(`[compare-site] Page "${pageName}" not found in manifest, skipping.`);
-        continue;
-      }
-
-      const pageDir = path.join(runDir, pageName);
-      fs.mkdirSync(pageDir, { recursive: true });
-
-      const pageOffset = pi * bandPerPage; // fraction through this page (0–1)
-
-      // ── ~20 % — Capturing live ─────────────────────────────────────────
-      updateJob(runId, {
-        phase: `Capturing live${pageCount > 1 ? ` (${pageName})` : ""}`,
-        progress: Math.round(20 + pageOffset * 20),
+      // Step 2: build the capture config from the two trees
+      const { live: livePage, staging: stagingPage } = await buildPageConfig({
+        liveTree,
+        stagingTree,
+        pageName: page.name || "page",
+        path: page.path || "/",
+        scrollIsWindow: true,
+        scrollRoot: null,
       });
-      console.log(`[compare-site] Capturing live: ${pageName}`);
-      const liveResult = await captureEnv(browser, livePageDef, path.join(pageDir, "live.png"), captureRunConfig);
 
-      // ── ~60 % — Capturing staging ──────────────────────────────────────
-      updateJob(runId, {
-        phase: `Capturing staging${pageCount > 1 ? ` (${pageName})` : ""}`,
-        progress: Math.round(50 + pageOffset * 20),
-      });
-      console.log(`[compare-site] Capturing staging: ${pageName}`);
-      const stagingResult = await captureEnv(browser, stagingPageDef, path.join(pageDir, "staging.png"), captureRunConfig);
-
-      // ── ~80 % — Comparing ──────────────────────────────────────────────
-      updateJob(runId, {
-        phase: `Comparing${pageCount > 1 ? ` (${pageName})` : ""}`,
-        progress: Math.round(80 + pageOffset * 20),
-      });
-      const matches = matchDatasetSections(liveResult.capturedSections, stagingResult.capturedSections, livePageDef.sections);
-      const { diffSectionMap, sectionMismatchPcts } = await diffSections(matches);
-
-      // ── ~90 % — Building report ────────────────────────────────────────
-      updateJob(runId, {
-        phase: `Building report${pageCount > 1 ? ` (${pageName})` : ""}`,
-        progress: Math.round(90 + pageOffset * 20),
-      });
-      const orderedStitchSections = buildDiffStitchSections(liveResult.resolvedSections, matches);
-      const diffPath = path.join(pageDir, "diff.png");
-      await pageStitcher(orderedStitchSections, diffSectionMap, diffPath);
-
-      const avgMismatchPct = calcAvgMismatch(sectionMismatchPcts);
-        
-      allPageResults.push({
-        page: pageName,
-        livePageUrl: livePageDef.url,
-        stagingPageUrl: stagingPageDef.url,
-        liveUrl: toOutputUrl(path.join(runId, pageName, "live.png")),
-        stagingUrl: toOutputUrl(path.join(runId, pageName, "staging.png")),
-        diffUrl: toOutputUrl(path.join(runId, pageName, "diff.png")),
-        avgMismatchPct,
-        sectionCount: {
-          defined: livePageDef.sections.length,
-          captured: Object.keys(diffSectionMap).length,
-          matched: matches.filter((m) => m.kind === "matched").length,
-          missingInStaging: matches.filter((m) => m.kind === "live-only").length,
-          missingInLive: matches.filter((m) => m.kind === "staging-only").length,
-        },
+      results.push({
+        page: page.name || page.path || "page",
+        live: livePage,
+        staging: stagingPage,
       });
     }
 
-    // ── 100 % — Done ──────────────────────────────────────────────────────
-    completeJob(runId, { runId, runDate, runTime, results: allPageResults });
-    completed = true;//the comparison has been completed 
-  } catch (err) {
-    console.error(`[compare-site] Error in run ${runId}:`, err);
-    failJob(runId, err.message ?? "Unknown error");
+    return results;
+  } catch (error) {
+    console.error(`[compare-site] Error in run ${runId}:`, error);
   } finally {
     if (browser) await browser.close().catch(() => {});
-    if (!completed && runId) deleteJob(runId); //delete the current run incase of failures
   }
 }
+// async function runComparison({ runId, siteName, liveBaseUrl, stagingBaseUrl, pages, selectedDisplayResolution }) {
+//   let browser;
+//   let runDir;
+//   let completed = false;
+
+//   try {
+//     // ── 0 % — Initialising ────────────────────────────────────────────────
+//     updateJob(runId, { status: "running", phase: "Initialising", progress: 0 });
+
+//     const captureRunConfig = {
+//       ...captureConfig,
+//       viewport: selectedDisplayResolution === "mobile" ? { width: 412, height: 924 } : { width: 1440, height: 978 },
+//     };
+
+//     const { live: liveManifest, staging: stagingManifest } = await manifestSections(siteName, pages, liveBaseUrl, stagingBaseUrl);
+
+//     // ── 10 % — Launching browser ─────────────────────────────────────────
+//     updateJob(runId, { phase: "Launching browser", progress: 10 });
+//     browser = await getBrowser();
+
+//     // Unique output folder for this run
+//     runDir = path.join(OUTPUTS_DIR, runId);
+//     fs.mkdirSync(runDir, { recursive: true });
+
+//     const now = new Date();
+//     const runDate = now.toISOString().split("T")[0];
+//     const runTime = now.toTimeString().split(" ")[0];
+
+//     // Per-page progress band: live 20–49 %, staging 50–79 %, visual Diff and generate report 80–100 %,
+//     const pageCount = pages.length;
+//     const bandPerPage = pageCount > 0 ? 1 / pageCount : 1;
+
+//     const allPageResults = [];
+
+//     for (let pi = 0; pi < pages.length; pi++) {
+//       const pageName = pages[pi];
+//       const livePageDef = liveManifest[pageName];
+//       const stagingPageDef = stagingManifest[pageName];
+
+//       if (!livePageDef || !stagingPageDef) {
+//         console.warn(`[compare-site] Page "${pageName}" not found in manifest, skipping.`);
+//         continue;
+//       }
+
+//       const pageDir = path.join(runDir, pageName);
+//       fs.mkdirSync(pageDir, { recursive: true });
+
+//       const pageOffset = pi * bandPerPage; // fraction through this page (0–1)
+
+//       // ── ~20 % — Capturing live ─────────────────────────────────────────
+//       updateJob(runId, {
+//         phase: `Capturing live${pageCount > 1 ? ` (${pageName})` : ""}`,
+//         progress: Math.round(20 + pageOffset * 20),
+//       });
+//       console.log(`[compare-site] Capturing live: ${pageName}`);
+//       const liveResult = await captureEnv(browser, livePageDef, path.join(pageDir, "live.png"), captureRunConfig);
+
+//       // ── ~60 % — Capturing staging ──────────────────────────────────────
+//       updateJob(runId, {
+//         phase: `Capturing staging${pageCount > 1 ? ` (${pageName})` : ""}`,
+//         progress: Math.round(50 + pageOffset * 20),
+//       });
+//       console.log(`[compare-site] Capturing staging: ${pageName}`);
+//       const stagingResult = await captureEnv(browser, stagingPageDef, path.join(pageDir, "staging.png"), captureRunConfig);
+
+//       // ── ~80 % — Comparing ──────────────────────────────────────────────
+//       updateJob(runId, {
+//         phase: `Comparing${pageCount > 1 ? ` (${pageName})` : ""}`,
+//         progress: Math.round(80 + pageOffset * 20),
+//       });
+//       const matches = matchDatasetSections(liveResult.capturedSections, stagingResult.capturedSections, livePageDef.sections);
+//       const { diffSectionMap, sectionMismatchPcts } = await diffSections(matches);
+
+//       // ── ~90 % — Building report ────────────────────────────────────────
+//       updateJob(runId, {
+//         phase: `Building report${pageCount > 1 ? ` (${pageName})` : ""}`,
+//         progress: Math.round(90 + pageOffset * 20),
+//       });
+//       const orderedStitchSections = buildDiffStitchSections(liveResult.resolvedSections, matches);
+//       const diffPath = path.join(pageDir, "diff.png");
+//       await pageStitcher(orderedStitchSections, diffSectionMap, diffPath);
+
+//       const avgMismatchPct = calcAvgMismatch(sectionMismatchPcts);
+
+//       allPageResults.push({
+//         page: pageName,
+//         livePageUrl: livePageDef.url,
+//         stagingPageUrl: stagingPageDef.url,
+//         liveUrl: toOutputUrl(path.join(runId, pageName, "live.png")),
+//         stagingUrl: toOutputUrl(path.join(runId, pageName, "staging.png")),
+//         diffUrl: toOutputUrl(path.join(runId, pageName, "diff.png")),
+//         avgMismatchPct,
+//         sectionCount: {
+//           defined: livePageDef.sections.length,
+//           captured: Object.keys(diffSectionMap).length,
+//           matched: matches.filter((m) => m.kind === "matched").length,
+//           missingInStaging: matches.filter((m) => m.kind === "live-only").length,
+//           missingInLive: matches.filter((m) => m.kind === "staging-only").length,
+//         },
+//       });
+//     }
+
+//     // ── 100 % — Done ──────────────────────────────────────────────────────
+//     completeJob(runId, { runId, runDate, runTime, results: allPageResults });
+//     completed = true;//the comparison has been completed
+//   } catch (err) {
+//     console.error(`[compare-site] Error in run ${runId}:`, err);
+//     failJob(runId, err.message ?? "Unknown error");
+//   } finally {
+//     if (browser) await browser.close().catch(() => {});
+//     if (!completed && runId) deleteJob(runId); //delete the current run incase of failures
+//   }
+// }
 
 router.delete("/compare-site/:runId", (req, res) => {
   const runId = req.params.runId;
