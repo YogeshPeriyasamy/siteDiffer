@@ -58,7 +58,7 @@ export const siteData = {
           scrollIsWindow: true,
           scrollRoot: null,
           sections: [
-            { section: "Header", selector: ".navigatinBar", state: [], captureType: "normal", floating: false },
+            { section: "Header", selector: "nav", state: [], captureType: "normal", floating: false },
             { section: "Share story", selector: ".shareStory", state: [], captureType: "normal", floating: false },
             { section: "Video Library", selector: "#Video_library", state: [], captureType: "normal", floating: false },
             { section: "Discussion Guide", selector: "#Doctor_discussion_guide_parent", state: [], captureType: "normal", floating: false },
