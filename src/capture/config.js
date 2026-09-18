@@ -22,5 +22,5 @@ export const captureConfig = {
 
   maxSectionRatio: 0.9, // 90% of the viewport height
 
-  maxDepth: 4,
+  maxDepth: 6, // max depth for structural selector fallback
 };

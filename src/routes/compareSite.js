@@ -11,7 +11,7 @@ import { captureEnv } from "../services/captureService.js";
 import { matchDatasetSections, diffSections, buildDiffStitchSections, calcAvgMismatch, toOutputUrl } from "../services/diffService.js";
 import { pageStitcher } from "../capture/pageStitcher.js";
 import { createJob, getJob, updateJob, completeJob, failJob, mapJob, deleteJob } from "../services/jobStore.js";
-import { sectionExtractor, buildPageConfig } from "../services/sectionMapper.js";
+import { buildDOMTree, buildPageConfig } from "../services/sectionMapper.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OUTPUTS_DIR = path.resolve(__dirname, "..", "outputs");
@@ -144,13 +144,13 @@ async function runComparison({ runId, selectedDisplayResolution, pages }) {
 
     for (const page of pages) {
       // Step 1: extract the full DOM hierarchy for both environments
-      const liveTree = await sectionExtractor(page.live, browser, captureConfig);
-      const stagingTree = await sectionExtractor(page.staging, browser, captureConfig);
+      const liveTree = await buildDOMTree(page.live, browser, captureConfig);
+      const stagingTree = await buildDOMTree(page.staging, browser, captureConfig);
 
-      // return { live: liveTree, staging: stagingTree };
+      return { live: liveTree, staging: stagingTree };
 
       // Step 2: build the capture config from the two trees
-      const { live: livePage, staging: stagingPage } = await buildPageConfig({
+      const { live: livePage, staging: stagingPage } = buildPageConfig({
         liveTree,
         stagingTree,
         pageName: page.name || "page",
