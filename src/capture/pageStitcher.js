@@ -13,6 +13,14 @@ export function normalizeSectionLayout(sections) {
 
   let cursorY = 0;
   return ordered.map((section) => {
+    // Floating sections (fixed/sticky headers, ISI panels) are placed at the
+    // bottom of the canvas by pageStitcher independently of normal flow.
+    // Their height must NOT advance the cursor — doing so creates grey gaps
+    // in the normal section area equal to the floater's height.
+    if (section.floating) {
+      return { ...section, y: 0 }; // y is unused for floaters; pageStitcher uses floatingTop
+    }
+
     const nextY = cursorY;
     cursorY += section.height || 0;
     return {

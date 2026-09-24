@@ -5,23 +5,23 @@ import { stabilizePage } from "../stabilize/index.js";
 // =============================================================================
 // DOM tree builder
 // =============================================================================
-export async function buildDOMTree(url, browser, captureConfig) {
-  const context = await browser.newContext({
-    viewport: captureConfig.viewport,
-    deviceScaleFactor: captureConfig.deviceScaleFactor,
-  });
+export async function buildDOMTree(page, captureConfig) {
+  // const context = await browser.newContext({
+  //   viewport: captureConfig.viewport,
+  //   deviceScaleFactor: captureConfig.deviceScaleFactor,
+  // });
 
   try {
-    const page = await context.newPage();
+    // const page = await context.newPage();
 
-    await page.goto(url, {
-      waitUntil: captureConfig.waitUntil,
-      timeout: captureConfig.timeout,
-    });
+    // await page.goto(url, {
+    //   waitUntil: captureConfig.waitUntil,
+    //   timeout: captureConfig.timeout,
+    // });
 
-    await stabilizePage(page);
-    await page.evaluate(() => window.scrollTo(0, 0));
-    await page.waitForTimeout(300);
+    // await stabilizePage(page);
+    // await page.evaluate(() => window.scrollTo(0, 0));
+    // await page.waitForTimeout(300);
 
     const scrollRootSelector = null;
     const scrollRootIsWindow = true;
@@ -171,9 +171,10 @@ export async function buildDOMTree(url, browser, captureConfig) {
     return sectionTree;
   } catch (error) {
     throw error;
-  } finally {
-    await context.close();
-  }
+  } 
+  // finally {
+  //   await context.close();
+  // }
 }
 
 // =============================================================================
@@ -471,7 +472,7 @@ function isOffscreen(node) {
 }
 
 function isInFlow(node) {
-  return node.position == "static" || node.position == "relative";
+  return node.position == "static" || node.position == "relative"|| node.position == "absolute" ;
 }
 
 function hasBox(node) {
@@ -646,8 +647,10 @@ function walkBothTrees(liveNode, stagingNode, liveNodeParent = null, stagingNode
 export function extractSectionsFromDOMTree(
   liveTree,
   stagingTree,
-  pageName = "trial page",
-  path = "/",
+  pageName,
+  path,
+  liveURL,
+  stagingURL,
   scrollIsWindow = true,
   scrollRoot = null,
 ) {
@@ -693,7 +696,7 @@ export function extractSectionsFromDOMTree(
 
   const base = { page: pageName, path, scrollIsWindow, scrollRoot };
   return {
-    live: { ...base, sections: liveSections },
-    staging: { ...base, sections: stagingSections },
+    live: { ...base, liveURL, sections: liveSections },
+    staging: { ...base, stagingURL, sections: stagingSections },
   };
 }
