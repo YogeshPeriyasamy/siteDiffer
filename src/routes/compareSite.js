@@ -229,10 +229,13 @@ async function runComparison({ runId, selectedDisplayResolution, pages }) {
           // return pageConfig;
 
           // create a unique key using section name
-          pageConfig.live.sections = pageConfig.live.sections.map((s, i) => ({ ...s, key: `${s.section.replace(/\s+/g, "_")}_${i}` }));
+          pageConfig.live.sections = pageConfig.live.sections.map((s, i) => ({
+            ...s,
+            key: `${s.section.replace(/\s+/g, "_")}__${s.selector.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 10)}`,
+          }));
           pageConfig.staging.sections = pageConfig.staging.sections.map((s, i) => ({
             ...s,
-            key: `${s.section.replace(/\s+/g, "_")}_${i}`,
+            key: `${s.section.replace(/\s+/g, "_")}__${s.selector.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 10)}`,
           }));
 
           const livePageDef = {
