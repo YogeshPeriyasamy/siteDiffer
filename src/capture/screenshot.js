@@ -76,6 +76,19 @@ export async function resolveGeometry(page, pageDef) {
   const { scrollRootSelector, scrollRootIsWindow, sections } = pageDef;
   const resolved = [];
 
+  await page.evaluate(() => {
+    const style = document.createElement("style");
+    style.id = "__probe-before-fix";
+    style.textContent = `
+    section[id]::before,
+    [id]::before {
+      height: 0 !important;
+      margin-top: 0 !important;
+    }
+  `;
+    document.head.appendChild(style);
+  });
+
   for (const section of sections) {
     if (section.stateConfig) {
       await applyStateConfig(page, section.stateConfig, scrollRootSelector, scrollRootIsWindow);
@@ -87,15 +100,22 @@ export async function resolveGeometry(page, pageDef) {
         const el = document.querySelector(selector);
         if (!el) return null;
         const rect = el.getBoundingClientRect();
+        //to add margin
+        const cs = window.getComputedStyle(el);
+        const marginTop = parseFloat(cs.marginTop) || 0;
+        const marginBottom = parseFloat(cs.marginBottom) || 0;
+        const marginLeft = parseFloat(cs.marginLeft) || 0;
+        const marginRight = parseFloat(cs.marginRight) || 0;
+
         const scrollX = scrollRootIsWindow ? window.scrollX : (document.querySelector(scrollRootSelector)?.scrollLeft ?? 0);
         const scrollY = scrollRootIsWindow ? window.scrollY : (document.querySelector(scrollRootSelector)?.scrollTop ?? 0);
         return {
-          x: Math.round(rect.left + scrollX),
-          y: Math.round(rect.top + scrollY),
-          width: Math.round(rect.width),
-          height: Math.round(rect.height),
-          viewportX: Math.round(rect.left),
-          viewportY: Math.round(rect.top),
+          x: Math.round(rect.left - marginLeft + scrollX),
+          y: Math.round(rect.top - marginTop + scrollY),
+          width: Math.round(rect.width + marginRight + marginLeft),
+          height: Math.round(rect.height + marginTop + marginBottom),
+          viewportX: Math.round(rect.left - marginLeft),
+          viewportY: Math.round(rect.top - marginTop),
           viewportRect: {
             x: Math.round(rect.left),
             y: Math.round(rect.top),
@@ -157,6 +177,11 @@ export async function resolveGeometry(page, pageDef) {
       );
     }
   }
+
+  // After geometry is resolved, remove the injected style
+  await page.evaluate(() => {
+    document.getElementById("__probe-before-fix")?.remove();
+  });
 
   return resolved;
 }

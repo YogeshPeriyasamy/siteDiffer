@@ -52,19 +52,19 @@ export function matchDatasetSections(liveSections, stagingSections, datasetSecti
 //
 // Returns { diffSectionMap, sectionMismatchPcts }
 // ---------------------------------------------------------------------------
-export async function diffSections(matches) {
+export async function diffSections(matches, threshold) {
   const diffSectionMap      = {};
-  const sectionMismatchPcts = [];
+  const sectionMismatchData = []; // { coveredPixels, totalPixels } per section
 
   for (const match of matches) {
     if (match.kind === "matched") {
       const { liveSection, stagingSection } = match;
       if (!liveSection?.buffer || !stagingSection?.buffer) continue;
 
-      const { buffer: diffBuffer, mismatchPct } =
-        await compareImages(liveSection.buffer, stagingSection.buffer);
+      const { buffer: diffBuffer, coveredPixels, width, height } =
+        await compareImages(liveSection.buffer, stagingSection.buffer, { threshold });
 
-      sectionMismatchPcts.push(mismatchPct);
+      sectionMismatchData.push({ coveredPixels, totalPixels: width * height });
       diffSectionMap[match.liveKey] = {
         ...liveSection,
         buffer:     diffBuffer,
@@ -79,12 +79,13 @@ export async function diffSections(matches) {
       const { liveSection } = match;
       if (!liveSection?.buffer) continue;
 
-      const { buffer: diffBuffer, mismatchPct } = await compareImages(
+      const { buffer: diffBuffer, coveredPixels, width, height } = await compareImages(
         liveSection.buffer,
         await missingSectionBuffer(liveSection.width, liveSection.height),
+        { threshold },
       );
 
-      sectionMismatchPcts.push(mismatchPct);
+      sectionMismatchData.push({ coveredPixels, totalPixels: width * height });
       diffSectionMap[match.liveKey] = {
         ...liveSection,
         buffer:     diffBuffer,
@@ -99,12 +100,13 @@ export async function diffSections(matches) {
       const { stagingSection } = match;
       if (!stagingSection?.buffer) continue;
 
-      const { buffer: diffBuffer, mismatchPct } = await compareImages(
+      const { buffer: diffBuffer, coveredPixels, width, height } = await compareImages(
         await missingSectionBuffer(stagingSection.width, stagingSection.height),
         stagingSection.buffer,
+        { threshold },
       );
 
-      sectionMismatchPcts.push(mismatchPct);
+      sectionMismatchData.push({ coveredPixels, totalPixels: width * height });
       diffSectionMap[match.stagingKey] = {
         ...stagingSection,
         buffer:     diffBuffer,
@@ -115,7 +117,7 @@ export async function diffSections(matches) {
     }
   }
 
-  return { diffSectionMap, sectionMismatchPcts };
+  return { diffSectionMap, sectionMismatchData };
 }
 
 // ---------------------------------------------------------------------------
@@ -155,12 +157,22 @@ export function buildDiffStitchSections(liveResolvedSections, matches) {
 
 // ---------------------------------------------------------------------------
 // calcAvgMismatch
+//
+// Accepts an array of { coveredPixels, totalPixels } — one entry per section.
+// Returns a true pixel-weighted percentage:
+//   totalCoveredPixels / totalSectionPixels × 100
+//
+// This matches what the user actually sees: what fraction of the full
+// stitched page area is inside a highlighted diff box.
 // ---------------------------------------------------------------------------
-export function calcAvgMismatch(sectionMismatchPcts) {
-  if (!sectionMismatchPcts.length) return 0;
-  return parseFloat(
-    (sectionMismatchPcts.reduce((a, b) => a + b, 0) / sectionMismatchPcts.length).toFixed(2),
-  );
+export function calcAvgMismatch(sectionMismatchData) {
+  if (!sectionMismatchData.length) return 0;
+
+  const totalCovered = sectionMismatchData.reduce((sum, s) => sum + s.coveredPixels, 0);
+  const totalPixels  = sectionMismatchData.reduce((sum, s) => sum + s.totalPixels,  0);
+
+  if (totalPixels === 0) return 0;
+  return parseFloat(((totalCovered / totalPixels) * 100).toFixed(4));
 }
 
 // ---------------------------------------------------------------------------

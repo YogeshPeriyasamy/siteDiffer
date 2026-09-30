@@ -77,9 +77,30 @@ export async function captureSections(page, extraction, captureConfig) {
           section.selector,
         );
       } else {
+        // Build selectors for normal sections that visually overlap this section's
+        // document Y range. These are elements like progress bars or decorative
+        // strips that sit inside a larger section's document range and are not
+        // fixed/sticky — so withFloatingHidden never hides them. Without hiding
+        // them they appear in this section's screenshot.
+        const overlappingSelectors = sections
+          .filter((s) => {
+            if (s.key === section.key) return false;   // skip self
+            if (s.floating) return false;              // floaters already in floatingSelectors
+            const sTop    = s.y ?? 0;
+            const sBottom = sTop + (s.height ?? 0);
+            const tTop    = section.y ?? 0;
+            const tBottom = tTop + (section.height ?? 0);
+            // s is fully contained within the current section's range
+            return sTop >= tTop && sBottom <= tBottom;
+          })
+          .map((s) => s.selector)
+          .filter(Boolean);
+
+        const selectorsToHide = [...floatingSelectors, ...overlappingSelectors];
+
         captureResult = await withFloatingHidden(
           page,
-          floatingSelectors,
+          selectorsToHide,
           async () => {
             if (section.captureType === "inner-scroll") {
               return captureInnerScrollSection(page, section, pageInfo, VW, VH, scrollEle, scrollIsWindow);

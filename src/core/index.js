@@ -36,6 +36,9 @@ export async function compareImages(liveInput, stagedInput, options = {}) {
     regions = mergeRegions(regions);
     regions = regions.map((r) => expandRegion(r, width, height));
 
+    // covered diff pixels
+    const coveredPixels = regions.reduce((sum, r) => sum + (r.maxX - r.minX) * (r.maxY - r.minY), 0);
+
     // Render highlighted diff on top of staged image
     const highlightedImage = await renderWithHighlight(stagedImage, regions, width, height, denoisedDiff);
 
@@ -43,11 +46,13 @@ export async function compareImages(liveInput, stagedInput, options = {}) {
     const buffer = await encoder(highlightedImage, width, height);
 
     // ── Mismatch percentage ──────────────────────────────────────────────
-    // diffCount is the number of genuinely different pixels after AA removal.
+    // coveredPixels = sum of expanded region bounding-box areas.
+    // mismatchPct   = fraction of THIS section's canvas that is highlighted.
+    // width/height are returned so callers can do a pixel-weighted page average.
     const totalPixels = width * height;
-    const mismatchPct = totalPixels > 0 ? parseFloat(((diff.diffCount / totalPixels) * 100).toFixed(2)) : 0;
+    const mismatchPct = totalPixels > 0 ? parseFloat(((coveredPixels / totalPixels) * 100).toFixed(4)) : 0;
 
-    return { buffer, mismatchPct };
+    return { buffer, mismatchPct, coveredPixels, width, height };
   } catch (error) {
     console.error("Error comparing images:", error);
     throw error;

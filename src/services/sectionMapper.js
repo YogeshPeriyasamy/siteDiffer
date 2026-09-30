@@ -50,6 +50,7 @@ export async function buildDOMTree(page, captureConfig) {
         }
 
         function isValidSection(el) {
+          if(el.className == "main-navigation") return false; // unwanted
           if (!isVisible(el)) return false;
           const text = getTextContent(el);
           const isSpacer = !text && el.children.length == 0;
@@ -171,7 +172,7 @@ export async function buildDOMTree(page, captureConfig) {
     return sectionTree;
   } catch (error) {
     throw error;
-  } 
+  }
   // finally {
   //   await context.close();
   // }
@@ -252,6 +253,8 @@ function hasFloaterDesc(node) {
 }
 
 function isVerticalContainer(node) {
+  if (node.geometry?.ratioOfViewport < 0.8) return false; //if the node is wihtin viewport donot recurse into it
+
   const kids = getChildren(node).filter((c) => !isOffscreen(c));
   const inFlow = kids.filter((c) => isInFlow(c));
   const absKids = kids.filter((c) => c.position == "absolute");
@@ -472,7 +475,7 @@ function isOffscreen(node) {
 }
 
 function isInFlow(node) {
-  return node.position == "static" || node.position == "relative"|| node.position == "absolute" ;
+  return node.position == "static" || node.position == "relative" || node.position == "absolute";
 }
 
 function hasBox(node) {
@@ -531,10 +534,11 @@ function generateSectionName(node) {
 }
 
 function getCaptureType(node) {
-  if (node.isScrollable) return "inner-scroll";
   const p = node.position;
   if (p === "fixed") return "fixed";
   if (p === "sticky") return "sticky";
+
+  if (node.isScrollable) return "inner-scroll";
   return "normal";
 }
 // =============================================================================

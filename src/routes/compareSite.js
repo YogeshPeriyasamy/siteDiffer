@@ -17,6 +17,7 @@ import { buildDOMTree, extractSectionsFromDOMTree } from "../services/sectionMap
 import { resolveGeometry } from "../capture/screenshot.js";
 import { captureSections } from "../capture/sectionCapturer.js";
 import { measurePage } from "../utils/measurePage.js";
+import {showAccordions} from "../services/revealHidden.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OUTPUTS_DIR = path.resolve(__dirname, "..", "outputs");
@@ -38,46 +39,56 @@ const router = Router();
 // ── POST /compare-site ────────────────────────────────────────────────────────
 // Starts the job asynchronously and immediately returns { runId }.
 // ─────────────────────────────────────────────────────────────────────────────
-router.post("/compare-site", (req, res) => {
-  const { siteName, liveBaseUrl, stagingBaseUrl, pages, selectedDisplayResolution } = req.body;
+// router.post("/compare-site", (req, res) => {
+//   const { siteName, liveBaseUrl, stagingBaseUrl, pages, selectedDisplayResolution, threshold } = req.body;
 
-  if (!siteName || !liveBaseUrl || !stagingBaseUrl || !pages?.length) {
-    return res.status(400).json({
-      message: "siteName, liveBaseUrl, stagingBaseUrl and pages[] are required",
+//   if (!siteName || !liveBaseUrl || !stagingBaseUrl || !pages?.length) {
+//     return res.status(400).json({
+//       message: "siteName, liveBaseUrl, stagingBaseUrl and pages[] are required",
+//     });
+//   }
+
+//   // Clamp threshold to the valid 0.1–0.9 range; default to 0.1 if omitted
+//   const clampedThreshold = Math.min(0.9, Math.max(0.1, parseFloat(threshold) || 0.1));
+
+//   const runId = randomUUID();
+//   createJob(runId);
+
+//   runComparison({
+//     runId,
+//     siteName,
+//     liveBaseUrl,
+//     stagingBaseUrl,
+//     pages,
+//     selectedDisplayResolution,
+//     threshold: clampedThreshold,
+//   }).catch((err) => {
+//     console.error(`[compare-site] Unhandled top-level error for run ${runId}:`, err);
+//     failJob(runId, err.message ?? "Unknown error");
+//   });
+
+//   return res.status(202).json({ runId });
+// });
+
+router.post("/compare-site", async (req, res) => {
+  const { pages, selectedDisplayResolution, threshold } = req.body;
+
+  // console.log("pages", pages, threshold);
+
+  const runId = randomUUID();
+  createJob(runId);
+
+  // const result = await runComparison({ runId, selectedDisplayResolution, pages, threshold })
+  // return result;
+
+  res.status(202).json({ runId });
+
+  setImmediate(() => {
+    runComparison({ runId, selectedDisplayResolution, pages, threshold }).catch((err) => {
+      console.error(`[compare-site] Unhandled top-level error for run ${runId}:`, err);
+      failJob(runId, err.message ?? "Unknown error");
     });
-  }
-
-  const runId = randomUUID();
-  createJob(runId);
-
-  // Fire-and-forget — the route returns before this finishes
-  runComparison({
-    runId,
-    siteName,
-    liveBaseUrl,
-    stagingBaseUrl,
-    pages,
-    selectedDisplayResolution,
-  }).catch((err) => {
-    console.error(`[compare-site] Unhandled top-level error for run ${runId}:`, err);
-    failJob(runId, err.message ?? "Unknown error");
   });
-
-  return res.status(202).json({ runId });
-});
-
-router.post("/compare-sites", async (req, res) => {
-  const { pages } = req.body;
-
-  const runId = randomUUID();
-  createJob(runId);
-
-  const result = await runComparison({ runId, selectedDisplayResolution: "desktop", pages }).catch((err) => {
-    console.error(`[compare-site] Unhandled top-level error for run ${runId}:`, err);
-    failJob(runId, err.message ?? "Unknown error");
-  });
-  // return res.status(202).json({ result });
-  return res.status(202).json({ runId });
 });
 
 // ── GET /compare-site/:runId/status ──────────────────────────────────────────
@@ -143,7 +154,7 @@ router.get("/compare-site/:runId/status", (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // runComparison — the actual async worker
 // ─────────────────────────────────────────────────────────────────────────────
-async function runComparison({ runId, selectedDisplayResolution, pages }) {
+async function runComparison({ runId, selectedDisplayResolution, pages, threshold = 0.1 }) {
   let browser;
   let runDir;
   let completed = false;
@@ -225,7 +236,7 @@ async function runComparison({ runId, selectedDisplayResolution, pages }) {
             pages[pi].live,
             pages[pi].staging,
           );
-
+          console.log("pageConfig", pageConfig.live.sections, pageConfig.staging.sections);
           // return pageConfig;
 
           // create a unique key using section name
@@ -250,6 +261,11 @@ async function runComparison({ runId, selectedDisplayResolution, pages }) {
             scrollRootIsWindow: pageConfig.staging.scrollIsWindow,
             sections: pageConfig.staging.sections,
           };
+
+          //to reveal all the accordions
+          const liveOpenendAccordions = await showAccordions(livePage);
+          const stagingOpenendAccordions = await showAccordions(stagingPage);
+          console.log("accordions", liveOpenendAccordions, stagingOpenendAccordions);
 
           const liveResolvedSections = await resolveGeometry(livePage, livePageDef);
           const stagingResolvedSections = await resolveGeometry(stagingPage, stagingPageDef);
@@ -302,7 +318,7 @@ async function runComparison({ runId, selectedDisplayResolution, pages }) {
             progress: Math.round(75 + pageOffset * 10),
           });
           const matches = matchDatasetSections(liveCapturedSections, stagingCapturedSections, livePageDef.sections);
-          const { diffSectionMap, sectionMismatchPcts } = await diffSections(matches);
+          const { diffSectionMap, sectionMismatchData } = await diffSections(matches, threshold);
 
           // ── 85 % — Building report ────────────────────────────────────────
           updateJob(runId, {
@@ -313,7 +329,7 @@ async function runComparison({ runId, selectedDisplayResolution, pages }) {
           const diffPath = path.join(pageDir, "diff.png");
           await pageStitcher(orderedStitchSections, diffSectionMap, diffPath);
 
-          const avgMismatchPct = calcAvgMismatch(sectionMismatchPcts);
+          const avgMismatchPct = calcAvgMismatch(sectionMismatchData);
 
           results.push({
             page: pages[pi].label,

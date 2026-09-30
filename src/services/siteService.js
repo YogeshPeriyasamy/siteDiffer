@@ -167,6 +167,9 @@ export function resolveSiteKeyFromUrl(url) {
 // it is also included. Pages are deduped by id.
 // ---------------------------------------------------------------------------
 export async function getPagesForSite(url, browser) {
+  const requestedUrl = new URL(url);
+  requestedUrl.hash = "";
+
   const context = await browser.newContext({
     viewport: captureConfig.viewport,
     deviceScaleFactor: captureConfig.deviceScaleFactor,
@@ -180,32 +183,53 @@ export async function getPagesForSite(url, browser) {
       timeout: captureConfig.timeout,
     });
 
-    let pages = await page.evaluate(() => {
-      const currentOrigin = window.location.origin;
-      const anchors = Array.from(document.querySelectorAll("a"));
+    let pages = await page.evaluate(
+      ({ homeUrl, sectionPath }) => {
+        const currentOrigin = window.location.origin;
+        const anchors = Array.from(document.querySelectorAll("a"));
 
-      return anchors.map((anchor) => {
-        const href = anchor.getAttribute("href");
-        if (!href) return null;
+        const linkedPages = anchors.map((anchor) => {
+          const href = anchor.getAttribute("href");
+          if (!href) return null;
 
-        try {
-          const url = new URL(href, window.location.href);
+          try {
+            const url = new URL(href, window.location.href);
 
-          // Only include links that are on the same origin as the current page
-          if (url.origin !== currentOrigin) return null;
+            // Only include links that are on the same origin as the current page
+            if (url.origin !== currentOrigin) return null;
 
-          // to remove section fragments #section from the path
-          url.hash = "";
+            // Keep discovery within a path-based site section such as /hcp.
+            if (sectionPath && url.pathname !== sectionPath && !url.pathname.startsWith(`${sectionPath}/`)) {
+              return null;
+            }
 
-          return {
-            url: { fullURL: url.href, path: url.pathname, origin: url.origin },
-            label: url.pathname.split("/").filter(Boolean).pop()?.toUpperCase()?.replace(/[-_]/g, " ") || "HOME",
-          };
-        } catch {
-          return null;
-        }
-      });
-    });
+            // to remove section fragments #section from the path
+            url.hash = "";
+
+            return {
+              url: { fullURL: url.href, path: url.pathname, origin: url.origin },
+              label: url.pathname.split("/").filter(Boolean).pop()?.toUpperCase()?.replace(/[-_]/g, " ") || "HOME",
+            };
+          } catch {
+            return null;
+          }
+        });
+
+        const initialUrl = new URL(homeUrl);
+
+        return [
+          ...linkedPages,
+          {
+            url: { fullURL: initialUrl.href, path: initialUrl.pathname, origin: initialUrl.origin },
+            label: "HOME",
+          },
+        ];
+      },
+      {
+        homeUrl: requestedUrl.href,
+        sectionPath: requestedUrl.pathname.replace(/\/+$/, ""),
+      },
+    );
 
     pages = pages.filter((page) => page !== null);
     //unique pages by path
@@ -219,19 +243,20 @@ export async function getPagesForSite(url, browser) {
   }
 }
 
-export function mapPages(livePages, stagingPages) {
-  const liveMap = new Map(livePages.map((page) => [page.url.path, page]));
-  const stagingMap = new Map(stagingPages.map((page) => [page.url.path, page]));
+export function mapPages(livePages, stagingPages, liveBaseUrl, stagingBaseUrl) {
+  const liveMap = new Map(livePages.map((page) => [getComparablePath(page.url.path, liveBaseUrl), page]));
+  const stagingMap = new Map(stagingPages.map((page) => [getComparablePath(page.url.path, stagingBaseUrl), page]));
 
   const matchedPages = [];
   const addedPages = [];
   const deletedPages = [];
 
   //Matched + Added Pages
-  for(const stagingPage of stagingPages) {
-    const livePage = liveMap.get(stagingPage.url.path);
+  for (const stagingPage of stagingPages) {
+    const comparisonPath = getComparablePath(stagingPage.url.path, stagingBaseUrl);
+    const livePage = liveMap.get(comparisonPath);
 
-    if(livePage) {
+    if (livePage) {
       matchedPages.push({
         path: livePage.url.path,
         label: livePage.label,
@@ -249,8 +274,8 @@ export function mapPages(livePages, stagingPages) {
   }
 
   //deleted Pages
-  for(const livePage of livePages) {
-    if(!stagingMap.has(livePage.url.path)) {
+  for (const livePage of livePages) {
+    if (!stagingMap.has(getComparablePath(livePage.url.path, liveBaseUrl))) {
       deletedPages.push({
         path: livePage.url.path,
         label: livePage.label,
@@ -261,6 +286,19 @@ export function mapPages(livePages, stagingPages) {
   }
 
   return { matchedPages, addedPages, deletedPages };
+}
+
+function getComparablePath(path, baseUrl) {
+  let comparablePath = path;
+
+  if (baseUrl) {
+    const basePath = new URL(baseUrl).pathname.replace(/\/+$/, "");
+    if (basePath && (path === basePath || path.startsWith(`${basePath}/`))) {
+      comparablePath = path.slice(basePath.length) || "/";
+    }
+  }
+
+  return comparablePath.length > 1 ? comparablePath.replace(/\/+$/, "") : comparablePath;
 }
 
 // export function getPagesForSite(siteKey) {

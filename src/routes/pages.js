@@ -22,6 +22,8 @@ router.get("/pages", async (req, res) => {
     return res.status(400).json({ message: "Please provide valid live and staging URLs" });
   }
 
+  console.log(`fetching pages.... for ${liveUrl} and ${stagingUrl}`);
+
    const browser = await getBrowser();
 
    const liveSitepages = await getPagesForSite(liveUrl, browser);
@@ -29,7 +31,7 @@ router.get("/pages", async (req, res) => {
 
   //  console.log("Live Site Pages:", liveSitepages);
   //  console.log("Staging Site Pages:", stagingSitepages);
-  const pages = mapPages(liveSitepages, stagingSitepages);
+  const pages = mapPages(liveSitepages, stagingSitepages, liveUrl, stagingUrl);
   // console.log("Mapped Pages:", pages);
 
    res.status(200).json({ pages });

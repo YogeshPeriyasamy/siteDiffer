@@ -167,7 +167,7 @@ export async function pageStitcher(sections, sectionMap, outputPath) {
   }
 
   const stitchedImage = sharp({
-    create: { width: canvasW, height: canvasH, channels: 3, background: "#f5f5f5" },
+    create: { width: canvasW, height: canvasH, channels: 3, background: "#fff" },
   })
     .composite(composites)
     .png();
