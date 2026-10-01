@@ -6,23 +6,8 @@ import { stabilizePage } from "../stabilize/index.js";
 // DOM tree builder
 // =============================================================================
 export async function buildDOMTree(page, captureConfig) {
-  // const context = await browser.newContext({
-  //   viewport: captureConfig.viewport,
-  //   deviceScaleFactor: captureConfig.deviceScaleFactor,
-  // });
-
+ 
   try {
-    // const page = await context.newPage();
-
-    // await page.goto(url, {
-    //   waitUntil: captureConfig.waitUntil,
-    //   timeout: captureConfig.timeout,
-    // });
-
-    // await stabilizePage(page);
-    // await page.evaluate(() => window.scrollTo(0, 0));
-    // await page.waitForTimeout(300);
-
     const scrollRootSelector = null;
     const scrollRootIsWindow = true;
 
@@ -173,9 +158,6 @@ export async function buildDOMTree(page, captureConfig) {
   } catch (error) {
     throw error;
   }
-  // finally {
-  //   await context.close();
-  // }
 }
 
 // =============================================================================

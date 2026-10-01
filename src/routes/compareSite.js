@@ -1,9 +1,11 @@
 import { Router } from "express";
 import path from "path";
 import fs from "fs";
+import sharp from "sharp";
 import { randomUUID } from "crypto";
 import { fileURLToPath } from "url";
 
+import { compareImages } from "../core/index.js";
 import manifestSections from "../services/siteService.js";
 import { stabilizePage } from "../stabilize/index.js";
 import { cleanUp } from "../capture/cleanUp.js";
@@ -17,63 +19,18 @@ import { buildDOMTree, extractSectionsFromDOMTree } from "../services/sectionMap
 import { resolveGeometry } from "../capture/screenshot.js";
 import { captureSections } from "../capture/sectionCapturer.js";
 import { measurePage } from "../utils/measurePage.js";
-import {showAccordions} from "../services/revealHidden.js";
+import { showAccordions } from "../services/revealHidden.js";
+import { captureFullPage } from "../capture/goFullPage.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OUTPUTS_DIR = path.resolve(__dirname, "..", "outputs");
 
 const router = Router();
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Progress thresholds
-//
-//   0 %  → Initialising          (job created, manifest loading)
-//  10 %  → Launching Browser     (browser boot)
-//  20 %  → Capturing Live        (live screenshots in flight)
-//  40 %  → Capturing Staging     (staging screenshots in flight)
-//  60 %  → Comparing             (pixel diff)
-//  80 %  → Building Report       (stitching diff images)
-// 100 %  → Done                  (completeJob)
-// ─────────────────────────────────────────────────────────────────────────────
-
-// ── POST /compare-site ────────────────────────────────────────────────────────
-// Starts the job asynchronously and immediately returns { runId }.
-// ─────────────────────────────────────────────────────────────────────────────
-// router.post("/compare-site", (req, res) => {
-//   const { siteName, liveBaseUrl, stagingBaseUrl, pages, selectedDisplayResolution, threshold } = req.body;
-
-//   if (!siteName || !liveBaseUrl || !stagingBaseUrl || !pages?.length) {
-//     return res.status(400).json({
-//       message: "siteName, liveBaseUrl, stagingBaseUrl and pages[] are required",
-//     });
-//   }
-
-//   // Clamp threshold to the valid 0.1–0.9 range; default to 0.1 if omitted
-//   const clampedThreshold = Math.min(0.9, Math.max(0.1, parseFloat(threshold) || 0.1));
-
-//   const runId = randomUUID();
-//   createJob(runId);
-
-//   runComparison({
-//     runId,
-//     siteName,
-//     liveBaseUrl,
-//     stagingBaseUrl,
-//     pages,
-//     selectedDisplayResolution,
-//     threshold: clampedThreshold,
-//   }).catch((err) => {
-//     console.error(`[compare-site] Unhandled top-level error for run ${runId}:`, err);
-//     failJob(runId, err.message ?? "Unknown error");
-//   });
-
-//   return res.status(202).json({ runId });
-// });
-
 router.post("/compare-site", async (req, res) => {
-  const { pages, selectedDisplayResolution, threshold } = req.body;
+  const { pages, selectedDisplayResolution = "desktop", threshold = 0.4, isFullpageCapture = true } = req.body;
 
-  // console.log("pages", pages, threshold);
+  console.log("pages", pages, threshold, isFullpageCapture);
 
   const runId = randomUUID();
   createJob(runId);
@@ -84,7 +41,7 @@ router.post("/compare-site", async (req, res) => {
   res.status(202).json({ runId });
 
   setImmediate(() => {
-    runComparison({ runId, selectedDisplayResolution, pages, threshold }).catch((err) => {
+    runComparison({ runId, selectedDisplayResolution, pages, threshold, isFullpageCapture }).catch((err) => {
       console.error(`[compare-site] Unhandled top-level error for run ${runId}:`, err);
       failJob(runId, err.message ?? "Unknown error");
     });
@@ -133,28 +90,10 @@ router.get("/compare-site/:runId/status", (req, res) => {
   req.on("close", unMap);
 });
 
-// router.get("/compare-site/:runId/status", (req, res) => {
-//   const job = getJob(req.params.runId);
-
-//   if (!job) {
-//     return res.status(404).json({ message: "Job not found" });
-//   }
-
-//   // Always return the full snapshot; result is null until done.
-//   return res.json({
-//     runId:    job.runId,
-//     status:   job.status,
-//     phase:    job.phase,
-//     progress: job.progress,
-//     result:   job.result,   // populated only when status === "done"
-//     error:    job.error,    // populated only when status === "error"
-//   });
-// });
-
 // ─────────────────────────────────────────────────────────────────────────────
 // runComparison — the actual async worker
 // ─────────────────────────────────────────────────────────────────────────────
-async function runComparison({ runId, selectedDisplayResolution, pages, threshold = 0.1 }) {
+async function runComparison({ runId, selectedDisplayResolution, pages, threshold, isFullpageCapture }) {
   let browser;
   let runDir;
   let completed = false;
@@ -219,6 +158,60 @@ async function runComparison({ runId, selectedDisplayResolution, pages, threshol
           await stagingPage.evaluate(() => window.scrollTo(0, 0));
           await stagingPage.waitForTimeout(300);
 
+          const pageDir = path.join(runDir, pages[pi].label);
+          fs.mkdirSync(pageDir, { recursive: true });
+
+          if (isFullpageCapture) {
+            const pageOffset = pi * bandPerPage;
+            updateJob(runId, {
+              phase: `Capturing live${pageCount > 1 ? ` (${pages[pi].label})` : ""}`,
+              progress: Math.round(40 + pageOffset * 10),
+            });
+            const livePageBuffer = await captureFullPage(livePage, captureRunConfig);
+
+            updateJob(runId, {
+              phase: `Capturing staging${pageCount > 1 ? ` (${pages[pi].label})` : ""}`,
+              progress: Math.round(55 + pageOffset * 10),
+            });
+            const stagingPageBuffer = await captureFullPage(stagingPage, captureRunConfig);
+
+            const livePngBuffer = await sharp(livePageBuffer).png().toBuffer();
+            const stagingPngBuffer = await sharp(stagingPageBuffer).png().toBuffer();
+            await Promise.all([
+              fs.promises.writeFile(path.join(pageDir, "live.png"), livePngBuffer),
+              fs.promises.writeFile(path.join(pageDir, "staging.png"), stagingPngBuffer),
+            ]);
+
+            updateJob(runId, {
+              phase: `Comparing${pageCount > 1 ? ` (${pages[pi].label})` : ""}`,
+              progress: Math.round(75 + pageOffset * 10),
+            });
+            const { buffer: rawDiffBuffer, mismatchPct } = await compareImages(livePngBuffer, stagingPngBuffer, {
+              threshold,
+            });
+            const diffBuffer = await sharp(rawDiffBuffer).png().toBuffer();
+            await fs.promises.writeFile(path.join(pageDir, "diff.png"), diffBuffer);
+
+            results.push({
+              page: pages[pi].label,
+              livePageUrl: pages[pi].live,
+              stagingPageUrl: pages[pi].staging,
+              liveUrl: toOutputUrl(path.join(runId, pages[pi].label, "live.png")),
+              stagingUrl: toOutputUrl(path.join(runId, pages[pi].label, "staging.png")),
+              diffUrl: toOutputUrl(path.join(runId, pages[pi].label, "diff.png")),
+              avgMismatchPct: mismatchPct,
+              sectionCount: {
+                defined: 1,
+                captured: 1,
+                matched: 1,
+                missingInStaging: 0,
+                missingInLive: 0,
+              },
+            });
+
+            continue;
+          }
+
           // ── 30 % — Extracting sections ─────────────────────────────────────────
           updateJob(runId, { phase: "Extracting Sections", progress: 30 });
           // Step 1: extract the full DOM hierarchy for both environments
@@ -276,8 +269,6 @@ async function runComparison({ runId, selectedDisplayResolution, pages, threshol
             phase: `Capturing live${pageCount > 1 ? ` (${pages[pi].label})` : ""}`,
             progress: Math.round(40 + pageOffset * 10),
           });
-          const pageDir = path.join(runDir, pages[pi].label);
-          fs.mkdirSync(pageDir, { recursive: true });
 
           const liveExtraction = {
             url: pages[pi].live,

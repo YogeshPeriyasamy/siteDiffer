@@ -4,17 +4,17 @@ export async function cleanUp(page) {
   // wait for delayed popups that appear after page load
   await page.waitForTimeout(1500);
 
-  // const btns = await page.$$(
-  //   'button:has-text("Accept All"), button:has-text("Accept All Cookies") , button:has-text("Accept Cookies") , button:has-text("I Agree") , button:has-text("Allow All"), button:has-text("Got It"), button:has-text("Yes, I Agree"), button:has-text("Accept")',
-  // );
-  // // accept cookies if the button exists
-  // for (const btn of btns) {
-  //   if (await btn.isVisible()) {
-  //     await btn.click();
-  //     await page.waitForTimeout(800);
-  //     isContentHidden = true;
-  //   }
-  // }
+  const btns = await page.$$(
+    'button:has-text("Accept All"), button:has-text("Accept All Cookies") , button:has-text("Accept Cookies") , button:has-text("I Agree") , button:has-text("Allow All"), button:has-text("Got It"), button:has-text("Yes, I Agree"), button:has-text("Accept")',
+  );
+  // accept cookies if the button exists
+  for (const btn of btns) {
+    if (await btn.isVisible()) {
+      await btn.click();
+      await page.waitForTimeout(800);
+      isContentHidden = true;
+    }
+  }
 
   await removeBlockingPopups(page);
 
@@ -56,7 +56,21 @@ export async function cleanUp(page) {
 
           // Remove known popup selectors
           document.querySelectorAll(KNOWN_SELECTORS).forEach((el) => {
-            hideElement(el, "known-selector");
+            const style = getComputedStyle(el);
+            const rect = el.getBoundingClientRect();
+            const zIndex = parseInt(style.zIndex) || 0;
+
+            // Only hide if it looks like a popup/overlay — NOT a regular inline element
+            const isFixed = style.position === "fixed" || style.position === "sticky";
+            const isLarge = rect.width > window.innerWidth * 0.2 && rect.height > window.innerHeight * 0.1;
+            const isElevated = zIndex > 10;
+            const isVisible = style.display !== "none" && style.visibility !== "hidden";
+
+            // A blocking popup is: fixed/sticky position + large enough + elevated z-index
+            // A footer link is:    static position + small + z-index 0 → skip it
+            if (isVisible && isFixed && isLarge && isElevated) {
+              hideElement(el, "known-selector-blocking");
+            }
           });
 
           // Detect blockers at center of screen

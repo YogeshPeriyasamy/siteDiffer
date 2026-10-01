@@ -23,4 +23,17 @@ export const captureConfig = {
   maxSectionRatio: 0.9, // 90% of the viewport height
 
   maxDepth: 6, // max depth for structural selector fallback
+
+  // Constants — tweak these to tune capture behaviour
+  OVERLAP_PX: 100, // each strip overlaps the previous by this many px
+
+  SCROLL_SETTLE_MS: 160, // ms pause after each scroll before screenshot
+
+  RAF_SETTLE_COUNT: 2, // wait this many animation frames after scroll
+
+  STABLE_CHECKS: 3, // how many identical visual signatures = "stable"
+
+  STABILITY_TIMEOUT: 1800, // max ms to wait for stability per strip
+
+  MIN_WAIT_MS: 400, // minimum ms before declaring stable
 };
