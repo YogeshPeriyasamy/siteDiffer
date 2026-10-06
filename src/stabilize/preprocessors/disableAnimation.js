@@ -41,6 +41,9 @@ export async function disableAnimations(page) {
         vid.addEventListener("loadedmetadata", resetAndPause);
       } catch {}
     }
-    document.querySelectorAll("video").forEach((video) => pauseAndResetVideo(video));
+    document.querySelectorAll("video").forEach((video) => {
+      console.log("Pausing video", video);
+      pauseAndResetVideo(video);
+    });
   });
 }

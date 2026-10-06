@@ -203,7 +203,8 @@ export async function getPagesForSite(url, browser) {
               return null;
             }
 
-            // to remove section fragments #section from the path
+            // to remove section fragments #section from the path and query params ?query=param from the path
+            url.search = "";
             url.hash = "";
 
             return {

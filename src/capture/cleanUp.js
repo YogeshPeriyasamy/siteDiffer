@@ -1,4 +1,6 @@
 export async function cleanUp(page) {
+  console.log("cleaning up page...");
+
   let isContentHidden = false;
 
   // wait for delayed popups that appear after page load

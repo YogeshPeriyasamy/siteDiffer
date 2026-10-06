@@ -7,10 +7,6 @@ async function unlockScroll(page) {
   return page.evaluate(() => {
     const restore = [];
 
-    // Patch an element's CSS property and record the original value for restore.
-    // Instead of storing the DOM node (which cannot cross the evaluate boundary),
-    // we assign a unique "data-fp-unlock" attribute so restoreCSS can re-query
-    // the element by that attribute inside a fresh evaluate call.
     let unlockCounter = 0;
     function patch(el, prop, value) {
       // Mark the element with a unique restore key the first time we touch it
@@ -86,10 +82,6 @@ async function classifyFixedElements(page, viewportWidth, viewportHeight) {
         const rect = el.getBoundingClientRect();
         if (rect.width < 10 || rect.height < 10) return;
 
-        // Assign a guaranteed-unique data attribute so we can reliably find this
-        // element again later — class/id selectors are ambiguous and fragile.
-        // We use setAttribute directly (not dataset) so the attribute name is
-        // exactly "data-fp-capture" with no double-dash surprises.
         const attrValue = `fp-${counter++}`;
         el.setAttribute("data-fp-capture", attrValue);
 
@@ -108,12 +100,8 @@ async function classifyFixedElements(page, viewportWidth, viewportHeight) {
 
         if (isInTopZone && isNavHeight) {
           // Any compact fixed/sticky element sitting entirely within the top 200px
-          // zone belongs to the header area — this catches nav bars, social bars,
-          // announcement strips, etc. regardless of their width.
           headerEls.push(descriptor);
         } else if (isTopAligned && isWide && !isNavHeight) {
-          // Wide + top-aligned but tall (e.g. hero background with position:fixed for parallax)
-          // Do NOT classify, do NOT hide — leave it visible so the hero renders correctly
         } else if (isBottomHalf && isTallEnough) {
           isiEls.push(descriptor);
         } else {
@@ -142,12 +130,6 @@ async function classifyFixedElements(page, viewportWidth, viewportHeight) {
 
   return result;
 }
-
-// ---------------------------------------------------------------------------
-// compositeHeader is no longer needed.
-// Strip 1 is taken before the header is hidden so the header appears
-// naturally at the top of the stitched image without any compositing.
-// ---------------------------------------------------------------------------
 
 async function hideElements(page, descriptors) {
   if (!descriptors.length) return [];
@@ -215,8 +197,6 @@ async function waitForStripStability(page, timeoutMs, minWaitMs, stableChecks) {
     if (previous === sig) stableCount++;
     else stableCount = 0;
 
-    // Only declare stable if we've seen the same signature stableChecks times
-    // AND we've been waiting at least minWaitMs total
     if (stableCount >= stableChecks && Date.now() - start >= minWaitMs) return;
     previous = sig;
   }
@@ -224,7 +204,6 @@ async function waitForStripStability(page, timeoutMs, minWaitMs, stableChecks) {
 }
 
 // Captures the first strip at scrollY=0 with header still visible.
-// Returns { buffer, scrollY: 0 }
 async function captureFirstStrip(page, VW, VH, STABILITY_TIMEOUT, MIN_WAIT_MS, STABLE_CHECKS, RAF_SETTLE_COUNT, SCROLL_SETTLE_MS) {
   await page.evaluate(() => window.scrollTo(0, 0));
 
@@ -272,8 +251,8 @@ async function captureRemainingStrips(
   // Safety: if scroll gets stuck (page intercepting scrollTo or smooth-scroll still active)
   // break after MAX_STUCK consecutive strips at the same position to avoid infinite loop.
   let lastActualScrollY = -1;
-  let stuckCount        = 0;
-  const MAX_STUCK       = 3;
+  let stuckCount = 0;
+  const MAX_STUCK = 3;
 
   // Start from stepSize — strip 1 (scrollY=0) was already captured with the header
   let targetScrollY = stepSize;
@@ -282,9 +261,6 @@ async function captureRemainingStrips(
   if (maxScrollY <= 0) return strips;
 
   while (true) {
-    // Use scrollTop assignment directly — bypasses Next.js / SPA router scroll
-    // interception that fights window.scrollTo() calls.
-    // Set __fpScrollStarted so the window.scrollTo patch blocks any reset-to-0.
     await page.evaluate((y) => {
       window.__fpScrollStarted = true;
       document.documentElement.scrollTop = y;
@@ -366,12 +342,6 @@ async function stitchStrips(strips, pageWidth, pageHeight, VW, VH) {
     .toBuffer();
 }
 
-// ---------------------------------------------------------------------------
-// stitchStrips — places each strip at its scrollY position on the canvas.
-// Strip 1 (scrollY=0, captured with header visible) sits at the top.
-// Later strips (header hidden) overwrite only the zones below headerHeight.
-// ---------------------------------------------------------------------------
-
 async function restoreElements(page, restoreData) {
   await page.evaluate((data) => {
     for (const item of data) {
@@ -388,9 +358,6 @@ async function restoreElements(page, restoreData) {
 
 async function restoreCSS(page, restoreData) {
   if (!restoreData || restoreData.length === 0) return;
-  // DOM nodes cannot be serialized across the evaluate boundary — they arrive
-  // as undefined. We re-query each element using the "data-fp-unlock" attribute
-  // that was stamped on it during unlockScroll, then remove the attribute.
   await page.evaluate((data) => {
     for (const item of data) {
       const el = document.querySelector(`[data-fp-unlock="${item.key}"]`);
@@ -406,41 +373,9 @@ async function restoreCSS(page, restoreData) {
   }, restoreData);
 }
 
-// =============================================================================
-// MAIN
-// =============================================================================
-export async function captureFullPage(page, captureConfig) {
-  const VW = captureConfig.viewport.width;
-  const VH = captureConfig.viewport.height;
-  const { OVERLAP_PX, SCROLL_SETTLE_MS, RAF_SETTLE_COUNT, STABLE_CHECKS, STABILITY_TIMEOUT, MIN_WAIT_MS } = captureConfig;
-
-  // ── Phase 0 — unlock scroll for fixed-body sites ─────────────────────────
-  const cssRestoreData = await unlockScroll(page);
-
-  // ── Phase 1 — classify fixed/sticky elements ─────────────────────────────
-  const { headerEls, isiEls, otherFixedEls } = await classifyFixedElements(page, VW, VH);
-
-  // ── Phase 2 — hide ISI + other fixed (NOT the header yet) ────────────────
-  // The header must stay visible for strip 1 so it appears naturally at top.
-  const nonHeaderRestoreData = await hideElements(page, [...isiEls, ...otherFixedEls]);
-
-  // ── Phase 3 — measure full page (after hiding ISI/other fixed) ───────────
-  const { pageHeight, pageWidth } = await measureFullPage(page);
-  console.log(`[fullPageCapture] page=${pageWidth}×${pageHeight}  viewport=${VW}×${VH}`);
-
-  // ── Phase 3b — disable smooth scroll + lock scroll restoration globally ──
-  // Must be done before ANY scrollTo call.
-  // 1. scroll-behavior:smooth causes window.scrollY to read 0 mid-animation.
-  // 2. Next.js / SPA routers intercept window.scrollTo() and reset to 0.
-  //    Setting scrollTop directly bypasses the router's scroll handler.
-  //    history.scrollRestoration = 'manual' stops browser scroll restoration.
-  //    Patching window.scrollTo blocks any framework reset-to-0 calls during capture.
-  // 3. Lenis / Locomotive Scroll virtual scroll libraries keep window.scrollY=0
-  //    permanently by using CSS transform instead of real scroll. Destroy them first.
+async function killScrollLibs(page) {
   await page.evaluate(() => {
-    // ── Kill virtual scroll libraries (Lenis, Locomotive Scroll) ─────────
-    // These libs lock window.scrollY at 0 and scroll via transform — must be
-    // destroyed before any scrollTo call will work.
+    // ── Kill virtual scroll libraries ───────────────────────────────────────
     try {
       if (window.lenis) {
         window.lenis.destroy();
@@ -467,9 +402,9 @@ export async function captureFullPage(page, captureConfig) {
 
     // Reset html/body that virtual scroll libs lock to overflow:hidden
     document.documentElement.style.setProperty("overflow", "auto", "important");
-    document.documentElement.style.setProperty("height",   "auto", "important");
+    document.documentElement.style.setProperty("height", "auto", "important");
     document.body.style.setProperty("overflow", "auto", "important");
-    document.body.style.setProperty("height",   "auto", "important");
+    document.body.style.setProperty("height", "auto", "important");
 
     // ── Kill smooth scroll ────────────────────────────────────────────────
     document.documentElement.style.setProperty("scroll-behavior", "auto", "important");
@@ -489,17 +424,43 @@ export async function captureFullPage(page, captureConfig) {
       orig(x, y);
     };
   });
+}
+
+// =============================================================================
+// MAIN
+// =============================================================================
+export async function captureFullPage(page, captureConfig) {
+  const VW = captureConfig.viewport.width;
+  const VH = captureConfig.viewport.height;
+  const { OVERLAP_PX, SCROLL_SETTLE_MS, RAF_SETTLE_COUNT, STABLE_CHECKS, STABILITY_TIMEOUT, MIN_WAIT_MS } = captureConfig;
+
+  // ── Phase 0 — Kill scroll libraries ─────────────────────────
+  await killScrollLibs(page);
+
+  // ── Phase 1 — unlock scroll for fixed-body sites ─────────────────────────
+  const cssRestoreData = await unlockScroll(page);
+
+  // ── Phase 2 — classify fixed/sticky elements ─────────────────────────────
+  const { headerEls, isiEls, otherFixedEls } = await classifyFixedElements(page, VW, VH);
+
+  // ── Phase 3 — hide ISI + other fixed (NOT the header yet) ────────────────
+  // The header must stay visible for strip 1 so it appears naturally at top.
+  const nonHeaderRestoreData = await hideElements(page, [...isiEls, ...otherFixedEls]);
+ 
+
+  // ── Phase 4 — measure full page (after hiding ISI/other fixed) ───────────
+  const { pageHeight, pageWidth } = await measureFullPage(page);
+  // console.log(`[fullPageCapture] page=${pageWidth}×${pageHeight}  viewport=${VW}×${VH}`);
 
   // Re-measure after virtual scroll teardown — layout may have changed
-  const { pageHeight: remeasuredHeight, pageWidth: remeasuredWidth } = await measureFullPage(page);
-  if (remeasuredHeight !== pageHeight || remeasuredWidth !== pageWidth) {
-    console.log(`[fullPageCapture] Re-measured after scroll teardown: ${remeasuredWidth}×${remeasuredHeight}`);
-  }
-  const finalPageHeight = remeasuredHeight;
-  const finalPageWidth  = remeasuredWidth;
+  // const { pageHeight: remeasuredHeight, pageWidth: remeasuredWidth } = await measureFullPage(page);
+  // if (remeasuredHeight !== pageHeight || remeasuredWidth !== pageWidth) {
+  //   console.log(`[fullPageCapture] Re-measured after scroll teardown: ${remeasuredWidth}×${remeasuredHeight}`);
+  // }
+  // const finalPageHeight = remeasuredHeight;
+  // const finalPageWidth = remeasuredWidth;
 
-  // ── Phase 4 — capture strip 1 at scrollY=0 WITH header visible ───────────
-  // This gives us the header + hero + all initial content in one natural shot.
+  // ── Phase 5 — capture strip 1 (with header still visible) ─────────────────────────
   const firstStrip = await captureFirstStrip(
     page,
     VW,
@@ -519,7 +480,7 @@ export async function captureFullPage(page, captureConfig) {
     page,
     VW,
     VH,
-    finalPageHeight,
+    pageHeight,
     OVERLAP_PX,
     SCROLL_SETTLE_MS,
     RAF_SETTLE_COUNT,
@@ -528,12 +489,8 @@ export async function captureFullPage(page, captureConfig) {
     MIN_WAIT_MS,
   );
 
-  // ── Phase 7 — stitch all strips into one image ───────────────────────────
-  // Strip 1 (scrollY=0) is placed at top=0 with header visible.
-  // Remaining strips (header hidden) are placed at their actual scrollY.
-  // Where strips overlap the later one overwrites — seamless result.
   const allStrips = [firstStrip, ...remainingStrips];
-  const finalBuffer = await stitchStrips(allStrips, finalPageWidth, finalPageHeight, VW, VH);
+  const finalBuffer = await stitchStrips(allStrips, pageWidth, pageHeight, VW, VH);
 
   // ── Phase 8 — restore everything ─────────────────────────────────────────
   await restoreElements(page, [...nonHeaderRestoreData, ...headerRestoreData]);

@@ -24,7 +24,7 @@ export const captureConfig = {
 
   maxDepth: 6, // max depth for structural selector fallback
 
-  // Constants — tweak these to tune capture behaviour
+  // constants for fullpage capture
   OVERLAP_PX: 100, // each strip overlaps the previous by this many px
 
   SCROLL_SETTLE_MS: 160, // ms pause after each scroll before screenshot

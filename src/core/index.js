@@ -50,7 +50,7 @@ export async function compareImages(liveInput, stagedInput, options = {}) {
     // mismatchPct   = fraction of THIS section's canvas that is highlighted.
     // width/height are returned so callers can do a pixel-weighted page average.
     const totalPixels = width * height;
-    const mismatchPct = totalPixels > 0 ? parseFloat(((coveredPixels / totalPixels) * 100).toFixed(4)) : 0;
+    const mismatchPct = totalPixels > 0 ? parseFloat(((coveredPixels / totalPixels) * 100).toFixed(2)) : 0;
 
     return { buffer, mismatchPct, coveredPixels, width, height };
   } catch (error) {
