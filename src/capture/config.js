@@ -27,7 +27,7 @@ export const captureConfig = {
   // constants for fullpage capture
   OVERLAP_PX: 100, // each strip overlaps the previous by this many px
 
-  SCROLL_SETTLE_MS: 160, // ms pause after each scroll before screenshot
+  SCROLL_SETTLE_MS: 1000, // ms pause after each scroll before screenshot
 
   RAF_SETTLE_COUNT: 2, // wait this many animation frames after scroll
 

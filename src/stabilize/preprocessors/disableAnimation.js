@@ -17,7 +17,7 @@ export async function disableAnimations(page) {
   await page.evaluate(() => {
     function pauseAndResetVideo(vid) {
       try {
-        if (vid.paused) return;
+        // if (vid.paused) return;
 
         vid.pause();
         vid.autoplay = false;

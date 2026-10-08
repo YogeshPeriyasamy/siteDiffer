@@ -15,7 +15,7 @@ const router = Router();
 router.post("/compare-site", async (req, res) => {
   const { pages, selectedDisplayResolution = "desktop", threshold = 0.4, isFullpageCapture = true } = req.body;
 
-  // console.log("pages", pages, threshold, isFullpageCapture);
+  console.log("pages", pages, threshold, isFullpageCapture);
 
   const runId = randomUUID();
   createJob(runId);

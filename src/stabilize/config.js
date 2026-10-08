@@ -10,7 +10,7 @@ export const defaultConfig = {
   },
 
   dom: {
-    quietMs: 1200,
+    quietMs: 3000,
     threshold: 2,
     sampleWindow: 5,
     pollIntervalMs: 200,
@@ -36,7 +36,7 @@ export const defaultConfig = {
   },
 
   images: {
-    timeoutMs: 20000,
+    timeoutMs: 30000,
   },
 
   fonts: {

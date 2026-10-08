@@ -186,7 +186,9 @@ async function waitForStripStability(page, timeoutMs, minWaitMs, stableChecks) {
         const rect = node.getBoundingClientRect();
         if (rect.width < 2 || rect.height < 2) continue;
         if (rect.bottom < 0 || rect.top > window.innerHeight) continue;
-        parts.push(`${Math.round(rect.left)},${Math.round(rect.top)},${Math.round(rect.width)},${Math.round(rect.height)}`);
+        parts.push(
+          `${Math.round(rect.left)},${Math.round(rect.top)},${Math.round(rect.width)},${Math.round(rect.height)},${style.opacity},${style.backgroundColor},${style.visibility}`,
+        );
         if (parts.length > 30) break;
       }
       return parts.join("|");
@@ -248,8 +250,7 @@ async function captureRemainingStrips(
   const maxScrollY = Math.max(0, pageHeight - VH);
   const strips = [];
 
-  // Safety: if scroll gets stuck (page intercepting scrollTo or smooth-scroll still active)
-  // break after MAX_STUCK consecutive strips at the same position to avoid infinite loop.
+  // safety guard against infinite loop if scrollY stops changing
   let lastActualScrollY = -1;
   let stuckCount = 0;
   const MAX_STUCK = 3;
@@ -446,7 +447,6 @@ export async function captureFullPage(page, captureConfig) {
   // ── Phase 3 — hide ISI + other fixed (NOT the header yet) ────────────────
   // The header must stay visible for strip 1 so it appears naturally at top.
   const nonHeaderRestoreData = await hideElements(page, [...isiEls, ...otherFixedEls]);
- 
 
   // ── Phase 4 — measure full page (after hiding ISI/other fixed) ───────────
   const { pageHeight, pageWidth } = await measureFullPage(page);
