@@ -71,18 +71,20 @@ export async function runComparison({ runId, selectedDisplayResolution, pages, t
           livePage = await liveContext.newPage();
           await livePage.goto(pages[pi].live, { waitUntil: captureRunConfig.waitUntil, timeout: captureRunConfig.timeout });
           await stabilizePage(livePage);
-          await cleanUp(livePage);
+          await cleanUp(livePage); 
+          await livePage.waitForTimeout(500);
           await livePage.evaluate(() => window.scrollTo(0, 0));
-          await livePage.waitForTimeout(300);
+ 
 
           // ── 20 % — launch page and stabilize it ─────────────────────────────────────────
           updateJob(runId, { phase: "Launching site2 and stabilizing", progress: 20 });
           stagingPage = await stagingContext.newPage();
+          // stagingPage.on("console", (msg) => console.log("[STAGING BROWSER]", msg.type(), msg.text()));
           await stagingPage.goto(pages[pi].staging, { waitUntil: captureRunConfig.waitUntil, timeout: captureRunConfig.timeout });
           await stabilizePage(stagingPage);
           await cleanUp(stagingPage);
           await stagingPage.evaluate(() => window.scrollTo(0, 0));
-          await stagingPage.waitForTimeout(300);
+          await stagingPage.waitForTimeout(500);
 
           const pageDir = path.join(runDir, pages[pi].label);
           fs.mkdirSync(pageDir, { recursive: true });

@@ -1,4 +1,5 @@
-export async function cleanUp(page) {
+export async function cleanUp(page, options = {}) {
+  const { debug = false } = options;
   console.log("cleaning up page...");
 
   let isContentHidden = false;
@@ -12,13 +13,17 @@ export async function cleanUp(page) {
   // accept cookies if the button exists
   for (const btn of btns) {
     if (await btn.isVisible()) {
+      // page.on("console", (msg) => console.log("[BROWSER]", msg.text()));
+      // await page.evaluate(() => {
+      //   window.addEventListener("scroll", () => console.log("SCROLL FIRED scrollY=", window.scrollY), { capture: true });
+      // });
       await btn.click();
-      await page.waitForTimeout(800);
+      await page.waitForTimeout(2000);
       isContentHidden = true;
     }
   }
 
-  await removeBlockingPopups(page);
+  await removeBlockingPopups(page, { debug });
 
   async function removeBlockingPopups(page, options = {}) {
     const { retries = 3, delay = 700, debug = false } = options;
@@ -89,11 +94,14 @@ export async function cleanUp(page) {
               const rect = el.getBoundingClientRect();
               const z = parseInt(s.zIndex) || 0;
               const isFixed = s.position === "fixed" || s.position === "sticky";
-              const largeEnough = rect.width > window.innerWidth * 0.25 && rect.height > window.innerHeight * 0.15;
+              const largeEnough = rect.width > window.innerWidth * 0.5 && rect.height > window.innerHeight * 0.25;
               const visuallyVisible = s.display !== "none" && s.visibility !== "hidden" && s.opacity !== "0";
               const blocksClicks = s.pointerEvents !== "none";
               const highZ = z > 50;
-              const modalLike = /modal|popup|overlay|dialog|cookie|consent|backdrop/i.test((el.className || "") + " " + (el.id || ""));
+              const modalLike =
+                /modal|popup|overlay|dialog|cookie|consent|backdrop/i.test((el.className || "") + " " + (el.id || "")) &&
+                largeEnough &&
+                isFixed;
               const shouldHide = visuallyVisible && blocksClicks && ((isFixed && highZ && largeEnough) || modalLike);
               if (shouldHide) hideElement(el, "center-blocker");
             } catch {}

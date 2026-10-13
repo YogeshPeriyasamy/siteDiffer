@@ -265,6 +265,7 @@ async function captureRemainingStrips(
     await page.evaluate((y) => {
       window.__fpScrollStarted = true;
       document.documentElement.scrollTop = y;
+      window.scrollTo(0, y);
       document.body.scrollTop = y; // Safari fallback
     }, targetScrollY);
 
@@ -435,6 +436,15 @@ export async function captureFullPage(page, captureConfig) {
   const VH = captureConfig.viewport.height;
   const { OVERLAP_PX, SCROLL_SETTLE_MS, RAF_SETTLE_COUNT, STABLE_CHECKS, STABILITY_TIMEOUT, MIN_WAIT_MS } = captureConfig;
 
+  //only for orserdu hom epage increase overlap to capture parallax effect
+  const url = new URL(page.url());
+  const isOrserdu = /^(?:orserdu(?:_v\d+)?\.teststl\.com|(?:www\.)?orserdu\.com)$/i.test(url.hostname);
+  const isHomePage = url.pathname === "/";
+  const isNotHcp = !url.href.toLowerCase().includes("hcp");
+
+  const overlapPx = isOrserdu && isHomePage && isNotHcp ? 500 : OVERLAP_PX;
+  console.log(`[fullPageCapture] overlapPx=${overlapPx} (orserdu homepage special case)`);
+
   // ── Phase 0 — Kill scroll libraries ─────────────────────────
   await killScrollLibs(page);
 
@@ -481,7 +491,7 @@ export async function captureFullPage(page, captureConfig) {
     VW,
     VH,
     pageHeight,
-    OVERLAP_PX,
+    overlapPx,
     SCROLL_SETTLE_MS,
     RAF_SETTLE_COUNT,
     STABLE_CHECKS,
