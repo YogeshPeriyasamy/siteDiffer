@@ -5,15 +5,6 @@ import { findRegions, mergeRegions, expandRegion } from "./processing/cluster.js
 import { renderWithHighlight } from "./render/createHighlight.js";
 import { encoder } from "./render/imageEncode.js";
 
-// ---------------------------------------------------------------------------
-// compareImages
-//
-// Compares two images (buffers or file paths) and returns:
-//   {
-//     buffer:       Buffer  – the highlighted diff PNG
-//     mismatchPct:  number  – 0–100, percentage of pixels that differ
-//   }
-// ---------------------------------------------------------------------------
 
 export async function compareImages(liveInput, stagedInput, options = {}) {
   const { threshold = 0.3, ignoreAA = false } = options;
